@@ -1,0 +1,10 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f4fff6;
+}
+
+main {
+  min-height: 80vh;
+  padding: 2rem;
+}

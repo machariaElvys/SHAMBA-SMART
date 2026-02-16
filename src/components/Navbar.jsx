@@ -1,0 +1,19 @@
+import { Link } from "react-router-dom";
+import "../styles/navbar.css";
+
+function Navbar() {
+  return (
+    <nav className="navbar">
+      <h2>Shamba-Smart </h2>
+
+      <ul>
+        <li><Link to="/">Home</Link></li>
+        <li><Link to="/crops">Crops</Link></li>
+        <li><Link to="/learn">Learn</Link></li>
+        <li><Link to="/about">About</Link></li>
+      </ul>
+    </nav>
+  );
+}
+
+export default Navbar;
