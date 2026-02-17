@@ -40,11 +40,15 @@ function Dashboard({ currentCrop, setCrops }) {
   const [moisture, setMoisture] = useState(65);
   const [weather, setWeather] = useState("Sunny");
 
-  // ✅ History (last 10 readings)
+  // ✅ History (store last 10 readings)
   const [history, setHistory] = useState([]);
 
-  // ✅ Irrigation log (last 5 events)
+  // ✅ Irrigation log (store last 5 events) - NOT persisted, just session
   const [irrigationLog, setIrrigationLog] = useState([]);
+
+  // ✅ Controls
+  const [paused, setPaused] = useState(false);
+  const [tickMs, setTickMs] = useState(3000);
 
   // ✅ Crop profile ranges (safe fallbacks)
   const idealMoisture = currentCrop.idealMoisture ?? { min: 55, max: 70 };
@@ -73,8 +77,10 @@ function Dashboard({ currentCrop, setCrops }) {
     });
   };
 
-  // ✅ Simulate sensors + time passing (every 3 seconds)
+  // ✅ Simulate sensors + time passing
   useEffect(() => {
+    if (paused) return;
+
     const interval = setInterval(() => {
       const newTemp = Math.floor(Math.random() * 11) + 25; // 25–35
       const newMoisture = Math.floor(Math.random() * 41) + 40; // 40–80
@@ -85,7 +91,7 @@ function Dashboard({ currentCrop, setCrops }) {
       setMoisture(newMoisture);
       setWeather(newWeather);
 
-      // ✅ Save reading to history (keep last 10)
+      // Save reading to history (keep last 10)
       setHistory((prev) => {
         const next = [
           { t: Date.now(), temperature: newTemp, moisture: newMoisture, weather: newWeather },
@@ -94,30 +100,27 @@ function Dashboard({ currentCrop, setCrops }) {
         return next.slice(0, 10);
       });
 
-      // time passing (safe functional update)
+      // time passing
       updateCurrentCrop((c) => ({
-        lastWateredMinutes: (c.lastWateredMinutes ?? 0) + 3,
+        lastWateredMinutes: (c.lastWateredMinutes ?? 0) + Math.round(tickMs / 1000),
       }));
-    }, 3000);
+    }, tickMs);
 
     return () => clearInterval(interval);
-  }, [currentCrop.id]);
+  }, [currentCrop.id, tickMs, paused]);
 
   // ✅ Crop-aware health logic
   useEffect(() => {
     let delta = 0;
 
-    // Moisture relative to crop range
     if (moisture < idealMoisture.min) delta -= 3;
     else if (moisture > idealMoisture.max) delta -= 2;
     else delta += 1;
 
-    // Temperature relative to crop range
     if (temperature < idealTemp.min) delta -= 1;
     else if (temperature > idealTemp.max) delta -= 2;
     else delta += 1;
 
-    // Rain helps if moisture below range
     if (weather === "Rainy" && moisture < idealMoisture.min) delta += 1;
 
     updateCurrentCrop((c) => ({
@@ -125,11 +128,11 @@ function Dashboard({ currentCrop, setCrops }) {
     }));
   }, [temperature, moisture, weather, currentCrop.id]);
 
-  // ✅ Auto-water (crop-aware) + logging
+  // ✅ Auto-water + logging
   useEffect(() => {
     if (!currentCrop.autoWater) return;
 
-    const trigger = idealMoisture.min - 3; // slightly below target minimum
+    const trigger = idealMoisture.min - 3;
     if (moisture < trigger) {
       const before = moisture;
       const after = clamp(moisture + 15, 0, 100);
@@ -175,13 +178,12 @@ function Dashboard({ currentCrop, setCrops }) {
     return a;
   }, [temperature, moisture, currentCrop.health, idealMoisture, idealTemp]);
 
-  // ✅ Trends (compare current reading to previous reading)
+  // Trends
   const prevTemp = history[1]?.temperature;
   const prevMoist = history[1]?.moisture;
   const tempTrend = trend(temperature, prevTemp);
   const moistTrend = trend(moisture, prevMoist);
 
-  // ✅ Stats
   const stats = [
     { id: 1, title: "Temperature", value: `${temperature}°C ${tempTrend}` },
     { id: 2, title: "Soil Moisture", value: `${moisture}% ${moistTrend}` },
@@ -199,6 +201,29 @@ function Dashboard({ currentCrop, setCrops }) {
         {stats.map((s) => (
           <StatCard key={s.id} title={s.title} value={s.value} />
         ))}
+      </div>
+
+      {/* ✅ Simulation Controls */}
+      <div className="controls">
+        <div className="controls-left">
+          <h3>Simulation Controls</h3>
+          <p>Adjust update speed or pause the live readings.</p>
+        </div>
+
+        <div className="controls-right">
+          <label>
+            Update interval
+            <select value={tickMs} onChange={(e) => setTickMs(Number(e.target.value))}>
+              <option value={3000}>3 seconds</option>
+              <option value={5000}>5 seconds</option>
+              <option value={10000}>10 seconds</option>
+            </select>
+          </label>
+
+          <button className="btn btn-outline" onClick={() => setPaused((p) => !p)}>
+            {paused ? "Resume" : "Pause"}
+          </button>
+        </div>
       </div>
 
       <div className="farm-status">
@@ -277,11 +302,10 @@ function Dashboard({ currentCrop, setCrops }) {
         </div>
       </div>
 
-      {/* ✅ Recent Readings (store 10, show 5 for clean UI) */}
+      {/* ✅ Recent Readings (store 10, show 5) */}
       {history.length > 0 && (
         <div className="history">
           <h3>Recent Readings</h3>
-
           <div className="history-list">
             {history.slice(0, 5).map((h) => (
               <div className="history-item" key={h.t}>
