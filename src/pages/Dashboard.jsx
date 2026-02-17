@@ -13,6 +13,13 @@ function healthLabel(score) {
   return { text: "Critical", cls: "health-critical" };
 }
 
+function trend(current, previous) {
+  if (previous === undefined || previous === null) return "";
+  if (current > previous) return "↑";
+  if (current < previous) return "↓";
+  return "→";
+}
+
 function Dashboard({ currentCrop, setCrops }) {
   // ✅ Guard: if user removed all crops
   if (!currentCrop) {
@@ -32,6 +39,9 @@ function Dashboard({ currentCrop, setCrops }) {
   const [temperature, setTemperature] = useState(28);
   const [moisture, setMoisture] = useState(65);
   const [weather, setWeather] = useState("Sunny");
+
+  // ✅ History (last 10 readings)
+  const [history, setHistory] = useState([]);
 
   // ✅ Crop profile ranges (safe fallbacks)
   const idealMoisture = currentCrop.idealMoisture ?? { min: 55, max: 70 };
@@ -61,6 +71,15 @@ function Dashboard({ currentCrop, setCrops }) {
       setMoisture(newMoisture);
       setWeather(newWeather);
 
+      // ✅ Save reading to history (keep last 10)
+      setHistory((prev) => {
+        const next = [
+          { t: Date.now(), temperature: newTemp, moisture: newMoisture, weather: newWeather },
+          ...prev,
+        ];
+        return next.slice(0, 10);
+      });
+
       // time passing (safe functional update)
       updateCurrentCrop((c) => ({
         lastWateredMinutes: (c.lastWateredMinutes ?? 0) + 3,
@@ -68,7 +87,6 @@ function Dashboard({ currentCrop, setCrops }) {
     }, 3000);
 
     return () => clearInterval(interval);
-    // Only restart interval when switching to a different crop
   }, [currentCrop.id]);
 
   // ✅ Crop-aware health logic
@@ -91,7 +109,7 @@ function Dashboard({ currentCrop, setCrops }) {
     updateCurrentCrop((c) => ({
       health: clamp((c.health ?? 70) + delta, 0, 100),
     }));
-  }, [temperature, moisture, weather, currentCrop.id]); // range changes come from current crop selection
+  }, [temperature, moisture, weather, currentCrop.id]);
 
   // ✅ Auto-water (crop-aware)
   useEffect(() => {
@@ -130,10 +148,15 @@ function Dashboard({ currentCrop, setCrops }) {
     return a;
   }, [temperature, moisture, currentCrop.health, idealMoisture, idealTemp]);
 
-  // ✅ No icons required
+  // ✅ Trends (compare current reading to previous reading)
+  const prevTemp = history[1]?.temperature;
+  const prevMoist = history[1]?.moisture;
+  const tempTrend = trend(temperature, prevTemp);
+  const moistTrend = trend(moisture, prevMoist);
+
   const stats = [
-    { id: 1, title: "Temperature", value: `${temperature}°C` },
-    { id: 2, title: "Soil Moisture", value: `${moisture}%` },
+    { id: 1, title: "Temperature", value: `${temperature}°C ${tempTrend}` },
+    { id: 2, title: "Soil Moisture", value: `${moisture}% ${moistTrend}` },
     { id: 3, title: "Weather", value: weather },
     { id: 4, title: "Alerts", value: alerts },
   ];
@@ -225,6 +248,24 @@ function Dashboard({ currentCrop, setCrops }) {
             {weather === "Rainy" && <li>Rain detected — moisture may improve.</li>}
             {alerts === 0 && <li>Conditions look stable. Keep monitoring.</li>}
           </ul>
+        </div>
+      </div>
+
+      {/* ✅ Recent Readings (last 10) */}
+      <div className="history">
+        <h3>Recent Readings</h3>
+
+        <div className="history-list">
+          {history.slice(0,5).map((h) => (
+            <div className="history-item" key={h.t}>
+              <span className="history-time">
+                {new Date(h.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+              <span className="history-val">{h.moisture}%</span>
+              <span className="history-val">{h.temperature}°C</span>
+              <span className="history-weather">{h.weather}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

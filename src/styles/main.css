@@ -1,10 +1,31 @@
+/* Global reset */
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   font-family: Arial, sans-serif;
   background: #f4fff6;
+  color: #222;
 }
 
+/* Consistent page spacing */
 main {
   min-height: 80vh;
-  padding: 2rem;
+  padding: 28px 18px;
+}
+
+/* Premium centered container */
+.container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Mobile spacing */
+@media (max-width: 768px) {
+  main {
+    padding: 18px 14px;
+  }
 }

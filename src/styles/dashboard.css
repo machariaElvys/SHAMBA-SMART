@@ -220,3 +220,60 @@
     width: 100%; /* ✅ full width buttons */
   }
 }
+
+/* Recent Readings */
+.history {
+  margin-top: 18px;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.history h3 {
+  margin: 0 0 12px;
+  color: #12301f;
+}
+
+.history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: 90px 1fr 1fr 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(46, 125, 50, 0.06);
+  border: 1px solid rgba(46, 125, 50, 0.14);
+  font-size: 13px;
+}
+
+.history-time {
+  color: #3b4b43;
+  font-weight: 700;
+}
+
+.history-val {
+  color: #12301f;
+  font-weight: 800;
+}
+
+.history-weather {
+  color: #3b4b43;
+  font-weight: 700;
+  text-align: right;
+}
+
+@media (max-width: 520px) {
+  .history-item {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 6px;
+  }
+  .history-weather {
+    text-align: left;
+  }
+}

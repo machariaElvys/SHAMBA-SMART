@@ -64,7 +64,8 @@ function App() {
       <Navbar />
 
       <main>
-        <Routes>
+        <div className="container">
+       <Routes>
           <Route path="/" element={<Home />} />
 
            <Route
@@ -87,6 +88,8 @@ function App() {
           <Route path="/learn" element={<Learn />} />
           <Route path="/about" element={<About />} />
         </Routes>
+        </div>
+       
       </main>
 
       <Footer />
