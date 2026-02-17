@@ -88,7 +88,15 @@ function App() {
 
           <Route path="/learn" element={<Learn />} />
           <Route path="/about" element={<About />} />
-          <Route path="/library" element={<CropLibrary />} />
+          <Route path="/library"
+           element={<CropLibrary
+              crops={crops}
+              setCrops={setCrops}
+              currentCropId={currentCropId}
+              setCurrentCropId={setCurrentCropId}
+            
+
+            />} />
         </Routes>
         </div>
        
@@ -100,3 +108,4 @@ function App() {
 }
 
 export default App;
+

@@ -25,7 +25,7 @@ function getBestMatch(query) {
   const q = normalize(query);
   if (!q) return null;
 
-  // 1) exact match first
+  // exact match first
   const exact = CROP_DICTIONARY.find((c) => {
     const name = normalize(c.name);
     const key = normalize(c.key);
@@ -34,12 +34,13 @@ function getBestMatch(query) {
   });
   if (exact) return exact;
 
-  // 2) partial match
+  // partial match
   return CROP_DICTIONARY.find((c) => matchesCrop(c, q)) ?? null;
 }
 
-export default function CropLibrary() {
+export default function CropLibrary({ crops = [], setCrops, currentCropId }) {
   const [query, setQuery] = useState("");
+  const [statusMsg, setStatusMsg] = useState("");
 
   const selected = useMemo(() => getBestMatch(query), [query]);
 
@@ -49,13 +50,49 @@ export default function CropLibrary() {
     return CROP_DICTIONARY.filter((c) => matchesCrop(c, q)).slice(0, 6);
   }, [query]);
 
+  const currentCrop = useMemo(() => {
+    if (!currentCropId) return null;
+    return crops.find((c) => c.id === currentCropId) || null;
+  }, [crops, currentCropId]);
+
+  const applyToCurrentCrop = () => {
+    if (!selected) return;
+    if (!currentCropId) {
+      setStatusMsg("Add a crop first, then set it as Current in Crops.");
+      return;
+    }
+    if (typeof setCrops !== "function") return;
+
+    setCrops((prev) =>
+      prev.map((c) =>
+        c.id === currentCropId
+          ? {
+              ...c,
+              idealMoisture: {
+                min: selected.idealMoisture.min,
+                max: selected.idealMoisture.max,
+              },
+              idealTemp: {
+                min: selected.idealTemp.min,
+                max: selected.idealTemp.max,
+              },
+              profileLabel: `${selected.name} profile`,
+            }
+          : c
+      )
+    );
+
+    setStatusMsg(`Applied ${selected.name} profile to "${currentCrop?.name ?? "current crop"}".`);
+    setTimeout(() => setStatusMsg(""), 2500);
+  };
+
   return (
     <div className="lib-page">
       <header className="lib-hero">
         <p className="lib-kicker">Crop Library</p>
         <h1 className="lib-title">Search a crop and get practical insights.</h1>
         <p className="lib-subtitle">
-          A clean crop dictionary for moisture/temperature ranges, watering guidance, and common issues.
+          A crop dictionary for moisture/temperature ranges, watering guidance, and common issues.
         </p>
       </header>
 
@@ -71,9 +108,7 @@ export default function CropLibrary() {
           />
 
           <div className="lib-suggestions">
-            <p className="lib-small-title">
-              {normalize(query) ? "Matches" : "Popular"}
-            </p>
+            <p className="lib-small-title">{normalize(query) ? "Matches" : "Popular"}</p>
 
             <div className="lib-chip-wrap">
               {suggestions.map((c) => (
@@ -89,11 +124,37 @@ export default function CropLibrary() {
             </div>
           </div>
 
+          {/* Current crop info */}
+          <div className="lib-current">
+            <p className="lib-small-title">Current crop</p>
+            <p className="lib-current-text">
+              {currentCrop ? (
+                <>
+                  <strong>{currentCrop.name}</strong>{" "}
+                  <span className="lib-current-muted">
+                    ({currentCrop.profileLabel ?? "Generic profile"})
+                  </span>
+                </>
+              ) : (
+                <span className="lib-current-muted">
+                  None selected. Add a crop in Crops page.
+                </span>
+              )}
+            </p>
+          </div>
+
+          {!!statusMsg && (
+            <div className="lib-status">
+              {statusMsg}
+            </div>
+          )}
+
           {normalize(query) && !selected && (
             <div className="lib-empty">
               <p className="lib-empty-title">No match found</p>
               <p className="lib-empty-text">
-                Try another name. Example: <strong>corn</strong> for maize, <strong>kale</strong> for sukuma.
+                Try another name. Example: <strong>corn</strong> for maize,{" "}
+                <strong>kale</strong> for sukuma.
               </p>
             </div>
           )}
@@ -104,9 +165,7 @@ export default function CropLibrary() {
           {!normalize(query) && (
             <div className="lib-placeholder">
               <h2>Start typing a crop name</h2>
-              <p>
-                You’ll see ideal ranges and clear advice. Keep it practical, calm, and readable.
-              </p>
+              <p>You’ll see ideal ranges and clear advice. Keep it practical and readable.</p>
             </div>
           )}
 
@@ -127,9 +186,18 @@ export default function CropLibrary() {
                   </p>
                 </div>
 
-                {/* future button placeholder (not wired yet) */}
-                <button className="lib-btn-outline" type="button" disabled title="We can wire this later">
-                  Apply to Profile (soon)
+                <button
+                  className="lib-btn-outline"
+                  type="button"
+                  onClick={applyToCurrentCrop}
+                  disabled={!currentCropId}
+                  title={
+                    !currentCropId
+                      ? "Add a crop first, then set it as Current in Crops."
+                      : "Apply this profile to your current crop"
+                  }
+                >
+                  Apply to Current Crop
                 </button>
               </div>
 
@@ -189,7 +257,7 @@ export default function CropLibrary() {
               </div>
 
               <p className="lib-footer">
-                This is a local knowledge base for now. Later we can plug in real agronomy sources or APIs and expand the dataset.
+                After applying, your Dashboard targets update immediately for the current crop.
               </p>
             </div>
           )}
