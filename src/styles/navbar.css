@@ -41,3 +41,14 @@
     gap: 10px;
   }
 }
+
+.nav-brand {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+}
+
+.nav-brand h2 {
+  margin: 0;
+}
