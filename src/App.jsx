@@ -20,6 +20,11 @@ function App() {
       health: 78,
       lastWateredMinutes: 180,
       autoWater: false,
+
+    profileLabel: "Recommended (Maize)",
+    idealMoisture: { min: 60, max: 75 },
+    idealTemp: { min: 26, max: 32 },
+
     },
   ]);
 
