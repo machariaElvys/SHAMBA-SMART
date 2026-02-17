@@ -3,21 +3,41 @@
   color: white;
   display: flex;
   justify-content: space-between;
-  padding: 1rem 2rem;
+  align-items: center;
+
+  padding: 14px 20px;
+  gap: 14px;
+  flex-wrap: wrap; /* ✅ allows wrap on small screens */
 }
 
 .navbar ul {
   list-style: none;
   display: flex;
-  gap: 1.5rem;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  flex-wrap: wrap; /* ✅ wraps links */
 }
 
 .navbar a {
   color: white;
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .navbar a:hover {
   text-decoration: underline;
+}
+
+/* Mobile: stack brand + links */
+@media (max-width: 520px) {
+  .navbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .navbar ul {
+    width: 100%;
+    gap: 10px;
+  }
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Routes, Route } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
@@ -10,29 +10,54 @@ import Crops from "./pages/Crops";
 import Learn from "./pages/Learn";
 import About from "./pages/About";
 
+const STORAGE_KEY = "shambaSmart.crops.v1";
+const STORAGE_CURRENT_KEY = "shambaSmart.currentCropId.v1";
+
 function App() {
-  // ✅ All crops live here (single source of truth)
-  const [crops, setCrops] = useState([
-    {
-      id: crypto.randomUUID(),
-      name: "Maize",
-      stage: "Vegetative",
-      health: 78,
-      lastWateredMinutes: 180,
-      autoWater: false,
+  // ✅ load crops from localStorage (or start empty)
+  const [crops, setCrops] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
 
-    profileLabel: "Recommended (Maize)",
-    idealMoisture: { min: 60, max: 75 },
-    idealTemp: { min: 26, max: 32 },
+  // ✅ load current crop id (or null)
+  const [currentCropId, setCurrentCropId] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_CURRENT_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
 
-    },
-  ]);
+  // ✅ save crops whenever they change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(crops));
+  }, [crops]);
 
-  // ✅ Which crop is currently shown on Dashboard
-  const [currentCropId, setCurrentCropId] = useState(crops[0].id);
+  // ✅ save currentCropId whenever it changes
+  useEffect(() => {
+    if (currentCropId) localStorage.setItem(STORAGE_CURRENT_KEY, currentCropId);
+    else localStorage.removeItem(STORAGE_CURRENT_KEY);
+  }, [currentCropId]);
 
-  // Helper: get current crop object
-  const currentCrop = crops.find((c) => c.id === currentCropId) || crops[0];
+  // ✅ keep currentCropId valid
+  useEffect(() => {
+    if (crops.length === 0) {
+      setCurrentCropId(null);
+      return;
+    }
+    const stillExists = crops.some((c) => c.id === currentCropId);
+    if (!stillExists) setCurrentCropId(crops[0].id);
+  }, [crops, currentCropId]);
+
+  const currentCrop = useMemo(() => {
+    if (crops.length === 0) return null;
+    return crops.find((c) => c.id === currentCropId) || crops[0];
+  }, [crops, currentCropId]);
 
   return (
     <div>
@@ -44,14 +69,7 @@ function App() {
 
           <Route
             path="/dashboard"
-            element={
-              <Dashboard
-                currentCrop={currentCrop}
-                setCurrentCropId={setCurrentCropId}
-                crops={crops}
-                setCrops={setCrops}
-              />
-            }
+            element={<Dashboard currentCrop={currentCrop} setCrops={setCrops} />}
           />
 
           <Route

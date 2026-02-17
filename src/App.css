@@ -1,0 +1,21 @@
+/* Global */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f4fff6;
+  color: #222;
+}
+
+main {
+  min-height: 80vh;
+  padding: 24px;
+}
+
+/* Responsive padding */
+@media (max-width: 768px) {
+  main {
+    padding: 16px;
+  }
+}

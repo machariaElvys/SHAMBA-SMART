@@ -70,9 +70,27 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
   };
 
   const updateCrop = (cropId, updater) => {
-    setCrops((prev) =>
-      prev.map((c) => (c.id === cropId ? updater(c) : c))
-    );
+    setCrops((prev) => prev.map((c) => (c.id === cropId ? updater(c) : c)));
+  };
+
+  const removeCrop = (cropId) => {
+    // optional: confirm delete
+    const ok = window.confirm("Remove this crop?");
+    if (!ok) return;
+
+    setCrops((prev) => {
+      const next = prev.filter((c) => c.id !== cropId);
+
+      // if the removed crop was current, pick a new current
+      if (cropId === currentCropId) {
+        const newCurrent = next[0]?.id ?? null;
+        setCurrentCropId(newCurrent);
+      }
+
+      return next;
+    });
+
+    if (editingId === cropId) setEditingId(null);
   };
 
   return (
@@ -210,6 +228,14 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
                   onClick={() => setEditingId(isEditing ? null : crop.id)}
                 >
                   {isEditing ? "Done" : "Edit Profile"}
+                </button>
+
+                <button
+                  className="delete-btn"
+                  onClick={() => removeCrop(crop.id)}
+                  title="Remove crop"
+                >
+                  Remove
                 </button>
               </div>
             </div>

@@ -14,10 +14,31 @@ function healthLabel(score) {
 }
 
 function Dashboard({ currentCrop, setCrops }) {
+  // ✅ Guard: if user removed all crops
+  if (!currentCrop) {
+    return (
+      <div className="dashboard">
+        <h1>Farm Dashboard</h1>
+
+        <div className="farm-status">
+          <h2>No crops yet</h2>
+          <p>Go to the Crops page and add your first crop to start monitoring.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Sensors
   const [temperature, setTemperature] = useState(28);
   const [moisture, setMoisture] = useState(65);
   const [weather, setWeather] = useState("Sunny");
 
+  // ✅ Crop profile ranges (safe fallbacks)
+  const idealMoisture = currentCrop.idealMoisture ?? { min: 55, max: 70 };
+  const idealTemp = currentCrop.idealTemp ?? { min: 24, max: 32 };
+  const profileLabel = currentCrop.profileLabel ?? "Generic profile";
+
+  // helper to update only current crop in crops array
   const updateCurrentCrop = (patchOrFn) => {
     setCrops((prev) =>
       prev.map((c) => {
@@ -28,12 +49,7 @@ function Dashboard({ currentCrop, setCrops }) {
     );
   };
 
-  // ✅ Read ranges from crop (with safe fallback)
-  const idealMoisture = currentCrop.idealMoisture ?? { min: 55, max: 70 };
-  const idealTemp = currentCrop.idealTemp ?? { min: 24, max: 32 };
-  const profileLabel = currentCrop.profileLabel ?? "Generic profile";
-
-  // simulate sensors + time
+  // ✅ Simulate sensors + time passing (every 3 seconds)
   useEffect(() => {
     const interval = setInterval(() => {
       const newTemp = Math.floor(Math.random() * 11) + 25; // 25–35
@@ -45,21 +61,24 @@ function Dashboard({ currentCrop, setCrops }) {
       setMoisture(newMoisture);
       setWeather(newWeather);
 
-      // time passing (use functional update so it's always fresh)
-      updateCurrentCrop((c) => ({ lastWateredMinutes: (c.lastWateredMinutes ?? 0) + 3 }));
+      // time passing (safe functional update)
+      updateCurrentCrop((c) => ({
+        lastWateredMinutes: (c.lastWateredMinutes ?? 0) + 3,
+      }));
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [currentCrop.id]); // only depends on crop identity
+    // Only restart interval when switching to a different crop
+  }, [currentCrop.id]);
 
-  // sensors affect crop health (now crop-aware)
+  // ✅ Crop-aware health logic
   useEffect(() => {
     let delta = 0;
 
     // Moisture relative to crop range
     if (moisture < idealMoisture.min) delta -= 3;
     else if (moisture > idealMoisture.max) delta -= 2;
-    else delta += 1; // inside range = small recovery
+    else delta += 1;
 
     // Temperature relative to crop range
     if (temperature < idealTemp.min) delta -= 1;
@@ -69,14 +88,16 @@ function Dashboard({ currentCrop, setCrops }) {
     // Rain helps if moisture below range
     if (weather === "Rainy" && moisture < idealMoisture.min) delta += 1;
 
-    updateCurrentCrop((c) => ({ health: clamp((c.health ?? 70) + delta, 0, 100) }));
-  }, [temperature, moisture, weather, currentCrop.id]); // ideal ranges come from currentCrop
+    updateCurrentCrop((c) => ({
+      health: clamp((c.health ?? 70) + delta, 0, 100),
+    }));
+  }, [temperature, moisture, weather, currentCrop.id]); // range changes come from current crop selection
 
-  // auto-water (crop-aware)
+  // ✅ Auto-water (crop-aware)
   useEffect(() => {
     if (!currentCrop.autoWater) return;
 
-    const trigger = idealMoisture.min - 3; // a bit below min
+    const trigger = idealMoisture.min - 3; // slightly below target minimum
     if (moisture < trigger) {
       setMoisture((m) => clamp(m + 15, 0, 100));
       updateCurrentCrop((c) => ({
@@ -98,6 +119,7 @@ function Dashboard({ currentCrop, setCrops }) {
     updateCurrentCrop((c) => ({ autoWater: !c.autoWater }));
   };
 
+  // Alerts derived from crop-aware logic
   const alerts = useMemo(() => {
     let a = 0;
     if (temperature > idealTemp.max) a++;
@@ -106,9 +128,9 @@ function Dashboard({ currentCrop, setCrops }) {
     if (moisture > idealMoisture.max) a++;
     if ((currentCrop.health ?? 70) < 40) a++;
     return a;
-  }, [temperature, moisture, currentCrop.health]);
+  }, [temperature, moisture, currentCrop.health, idealMoisture, idealTemp]);
 
-  // icons optional — keep or remove
+  // ✅ No icons required
   const stats = [
     { id: 1, title: "Temperature", value: `${temperature}°C` },
     { id: 2, title: "Soil Moisture", value: `${moisture}%` },
@@ -132,12 +154,14 @@ function Dashboard({ currentCrop, setCrops }) {
         <div className="farm-status-top">
           <div>
             <h2>Current Crop</h2>
+
             <p>
               <strong>Crop:</strong> {currentCrop.name}
             </p>
             <p>
               <strong>Stage:</strong> {currentCrop.stage}
             </p>
+
             <p>
               <strong>Profile:</strong> {profileLabel}
             </p>
@@ -154,6 +178,7 @@ function Dashboard({ currentCrop, setCrops }) {
                 {hl.text} ({currentCrop.health}/100)
               </span>
             </p>
+
             <p>
               <strong>Last Watered:</strong> {currentCrop.lastWateredMinutes} minutes ago
             </p>
