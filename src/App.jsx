@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 import Crops from "./pages/Crops";
 import Learn from "./pages/Learn";
 import About from "./pages/About";
+import Dashboard from "./pages/Dashboard";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/crops" element={<Crops />} />
           <Route path="/learn" element={<Learn />} />
           <Route path="/about" element={<About />} />
+          <Route path="/dashboard" element={<Dashboard />} />
         </Routes>
       </main>
 

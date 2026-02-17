@@ -1,9 +1,16 @@
 function Learn() {
   return (
-    <section>
-      <h2>Learn Farming</h2>
-      <p>Guides and tips coming soon.</p>
-    </section>
+    <div className="page">
+      <h1>Learn Smart Farming </h1>
+
+      <ul>
+        <li>Soil Preparation</li>
+        <li>Irrigation Methods</li>
+        <li>Pest Control</li>
+        <li>Crop Rotation</li>
+        <li>Modern Farming Tech</li>
+      </ul>
+    </div>
   );
 }
 
