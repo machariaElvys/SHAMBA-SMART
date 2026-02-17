@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Crops from "./pages/Crops";
 import Learn from "./pages/Learn";
 import About from "./pages/About";
+import CropLibrary from "./pages/cropLibrary";
 
 const STORAGE_KEY = "shambaSmart.crops.v1";
 const STORAGE_CURRENT_KEY = "shambaSmart.currentCropId.v1";
@@ -87,6 +88,7 @@ function App() {
 
           <Route path="/learn" element={<Learn />} />
           <Route path="/about" element={<About />} />
+          <Route path="/library" element={<CropLibrary />} />
         </Routes>
         </div>
        
