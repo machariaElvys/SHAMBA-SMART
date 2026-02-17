@@ -1,3 +1,99 @@
-.crops {
-  margin-top: 2rem;
+.crops-page {
+  padding: 30px 32px;
+}
+
+.crop-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+
+  padding: 16px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  margin: 18px 0 22px;
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  color: #444;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.15);
+  outline: none;
+}
+
+.crop-btn {
+  padding: 12px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 800;
+  background: #2e7d32;
+  color: #fff;
+}
+
+.crop-btn:hover {
+  opacity: 0.92;
+}
+
+.crop-list {
+  display: grid;
+  gap: 12px;
+}
+
+.crop-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #f7fff9;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.crop-item.active {
+  border-left: 6px solid #2e7d32;
+}
+
+.crop-item h3 {
+  margin: 0 0 4px;
+  color: #1f3d2b;
+}
+
+.crop-item p {
+  margin: 0;
+  color: #444;
+  font-size: 13px;
+}
+
+.set-btn {
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  border: 2px solid #2e7d32;
+  background: transparent;
+  color: #2e7d32;
+}
+
+.set-btn:hover {
+  background: rgba(46, 125, 50, 0.08);
+}
+
+@media (max-width: 900px) {
+  .crop-form {
+    grid-template-columns: 1fr;
+  }
 }

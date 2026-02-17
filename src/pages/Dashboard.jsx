@@ -1,3 +1,6 @@
+// 
+
+
 import { useEffect, useMemo, useState } from "react";
 import StatCard from "../components/StatCard";
 import "../styles/dashboard.css";
@@ -13,22 +16,20 @@ function healthLabel(score) {
   return { text: "Critical 🚨", cls: "health-critical" };
 }
 
-function Dashboard() {
-  // ✅ Sensor states (alive)
-  const [temperature, setTemperature] = useState(28); // °C
-  const [moisture, setMoisture] = useState(65); // %
+function Dashboard({ currentCrop, crops, setCrops }) {
+  // Sensors
+  const [temperature, setTemperature] = useState(28);
+  const [moisture, setMoisture] = useState(65);
   const [weather, setWeather] = useState("Sunny");
 
-  // ✅ Farm / crop state (this is what user will later add to)
-  const [currentCrop, setCurrentCrop] = useState({
-    name: "Maize",
-    stage: "Vegetative",
-    health: 78, // 0–100
-    lastWateredMinutes: 180, // 3 hours ago
-    autoWater: false,
-  });
+  // helper to update only the current crop inside crops array
+  const updateCurrentCrop = (patch) => {
+    setCrops((prev) =>
+      prev.map((c) => (c.id === currentCrop.id ? { ...c, ...patch } : c))
+    );
+  };
 
-  // --- SENSOR SIMULATION LOOP ---
+  // simulate sensors + time
   useEffect(() => {
     const interval = setInterval(() => {
       const newTemp = Math.floor(Math.random() * 11) + 25; // 25–35
@@ -40,73 +41,59 @@ function Dashboard() {
       setMoisture(newMoisture);
       setWeather(newWeather);
 
-      // time passes
-      setCurrentCrop((prev) => ({
-        ...prev,
-        lastWateredMinutes: prev.lastWateredMinutes + 3, // because interval is 3 sec; pretend it's 3 minutes
-      }));
+      updateCurrentCrop({ lastWateredMinutes: currentCrop.lastWateredMinutes + 3 });
     }, 3000);
 
     return () => clearInterval(interval);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCrop.id, currentCrop.lastWateredMinutes]);
 
-  // --- SMART LOGIC: sensors affect crop health ---
+  // sensors affect crop health
   useEffect(() => {
-    setCurrentCrop((prev) => {
-      let delta = 0;
+    let delta = 0;
 
-      // moisture stress
-      if (moisture < 50) delta -= 3;
-      else if (moisture < 60) delta -= 1;
-      else if (moisture > 75) delta -= 1; // too wet can also be bad
+    if (moisture < 50) delta -= 3;
+    else if (moisture < 60) delta -= 1;
+    else if (moisture > 75) delta -= 1;
 
-      // temperature stress
-      if (temperature > 32) delta -= 2;
-      else if (temperature < 26) delta -= 1;
+    if (temperature > 32) delta -= 2;
+    else if (temperature < 26) delta -= 1;
 
-      // rain can help moisture stress slightly
-      if (weather === "Rainy" && moisture < 60) delta += 1;
+    if (weather === "Rainy" && moisture < 60) delta += 1;
 
-      // small natural recovery if conditions are good
-      const goodConditions =
-        moisture >= 60 && moisture <= 75 && temperature >= 26 && temperature <= 32;
-      if (goodConditions) delta += 1;
+    const goodConditions =
+      moisture >= 60 && moisture <= 75 && temperature >= 26 && temperature <= 32;
+    if (goodConditions) delta += 1;
 
-      const nextHealth = clamp(prev.health + delta, 0, 100);
-      return { ...prev, health: nextHealth };
-    });
-  }, [temperature, moisture, weather]);
+    updateCurrentCrop({ health: clamp(currentCrop.health + delta, 0, 100) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [temperature, moisture, weather, currentCrop.id]);
 
-  // --- AUTO WATER LOGIC ---
+  // auto-water
   useEffect(() => {
     if (!currentCrop.autoWater) return;
-
-    // If moisture too low, auto-water (raise moisture + reset lastWatered)
     if (moisture < 52) {
       setMoisture((m) => clamp(m + 15, 0, 100));
-      setCurrentCrop((prev) => ({
-        ...prev,
+      updateCurrentCrop({
         lastWateredMinutes: 0,
-        health: clamp(prev.health + 4, 0, 100),
-      }));
+        health: clamp(currentCrop.health + 4, 0, 100),
+      });
     }
-  }, [moisture, currentCrop.autoWater]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moisture, currentCrop.autoWater, currentCrop.id]);
 
-  // manual water button
-  function waterNow() {
+  const waterNow = () => {
     setMoisture((m) => clamp(m + 12, 0, 100));
-    setCurrentCrop((prev) => ({
-      ...prev,
+    updateCurrentCrop({
       lastWateredMinutes: 0,
-      health: clamp(prev.health + 3, 0, 100),
-    }));
-  }
+      health: clamp(currentCrop.health + 3, 0, 100),
+    });
+  };
 
-  function toggleAutoWater() {
-    setCurrentCrop((prev) => ({ ...prev, autoWater: !prev.autoWater }));
-  }
+  const toggleAutoWater = () => {
+    updateCurrentCrop({ autoWater: !currentCrop.autoWater });
+  };
 
-  // --- ALERTS derived from current state ---
   const alerts = useMemo(() => {
     let a = 0;
     if (temperature > 32) a++;
@@ -129,13 +116,8 @@ function Dashboard() {
       <h1>Farm Dashboard </h1>
 
       <div className="stats-grid">
-        {stats.map((stat) => (
-          <StatCard
-            key={stat.id}
-            title={stat.title}
-            value={stat.value}
-            icon={stat.icon}
-          />
+        {stats.map((s) => (
+          <StatCard key={s.id} title={s.title} value={s.value} icon={s.icon} />
         ))}
       </div>
 
@@ -143,36 +125,21 @@ function Dashboard() {
         <div className="farm-status-top">
           <div>
             <h2>Current Crop</h2>
-            <p>
-              <strong>Crop:</strong> {currentCrop.name} 
-            </p>
-            <p>
-              <strong>Stage:</strong> {currentCrop.stage}
-            </p>
+            <p><strong>Crop:</strong> {currentCrop.name}</p>
+            <p><strong>Stage:</strong> {currentCrop.stage}</p>
             <p>
               <strong>Health:</strong>{" "}
-              <span className={hl.cls}>
-                {hl.text} ({currentCrop.health}/100)
-              </span>
+              <span className={hl.cls}>{hl.text} ({currentCrop.health}/100)</span>
             </p>
-            <p>
-              <strong>Last Watered:</strong>{" "}
-              {currentCrop.lastWateredMinutes} minutes ago
-            </p>
+            <p><strong>Last Watered:</strong> {currentCrop.lastWateredMinutes} minutes ago</p>
           </div>
 
           <div className="actions">
-            <button className="btn" onClick={waterNow}>
-              Water Now !
-            </button>
-
+            <button className="btn" onClick={waterNow}>Water Now !</button>
             <button className="btn btn-outline" onClick={toggleAutoWater}>
               Auto Water: {currentCrop.autoWater ? "ON " : "OFF "}
             </button>
-
-            <p className="hint">
-              Auto-water triggers when moisture drops below ~52%.
-            </p>
+            <p className="hint">Auto-water triggers when moisture drops below ~52%.</p>
           </div>
         </div>
 
@@ -186,6 +153,8 @@ function Dashboard() {
           </ul>
         </div>
       </div>
+
+      {/* Optional: quick list of crops here later */}
     </div>
   );
 }
