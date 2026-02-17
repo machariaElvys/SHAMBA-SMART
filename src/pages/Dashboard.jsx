@@ -87,8 +87,14 @@ function Dashboard() {
 
         <p><strong>Crop:</strong> Maize </p>
         <p><strong>Stage:</strong> Vegetative</p>
-        <p><strong>Health:</strong> {alerts > 0 ? "Warning " : "Good "}</p>
-        <p><strong>Last Watered:</strong> 3 hours ago</p>
+     <p>
+       <strong>Health:</strong>{" "}
+       <span className={alerts > 0 ? "health-warn" : "health-good"}>
+       {alerts > 0 ? "Warning " : "Good "}
+       </span>
+      </p>       
+
+       <p><strong>Last Watered:</strong> 3 hours ago</p>
 
       </div>
 
