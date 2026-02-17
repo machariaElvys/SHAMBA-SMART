@@ -120,3 +120,86 @@
     font-size: 20px;
   }
 }
+
+/* =========================
+   ACTION BUTTONS + INSIGHTS
+========================= */
+
+.farm-status-top {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 18px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn {
+  padding: 12px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  background: #2e7d32;
+  color: white;
+}
+
+.btn:hover {
+  opacity: 0.92;
+}
+
+.btn-outline {
+  background: transparent;
+  color: #2e7d32;
+  border: 2px solid #2e7d32;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.smart-notes {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+
+.smart-notes h3 {
+  margin: 0 0 10px;
+  color: #1f3d2b;
+}
+
+.smart-notes ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #333;
+}
+
+/* =========================
+   HEALTH LEVELS
+========================= */
+
+.health-mid {
+  color: #c07a00;
+  font-weight: 700;
+}
+
+.health-critical {
+  color: #b71c1c;
+  font-weight: 800;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 900px) {
+  .farm-status-top {
+    grid-template-columns: 1fr;
+  }
+}
