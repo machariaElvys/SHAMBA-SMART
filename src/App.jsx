@@ -67,7 +67,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
 
-          <Route
+           <Route
             path="/dashboard"
             element={<Dashboard currentCrop={currentCrop} setCrops={setCrops} />}
           />
