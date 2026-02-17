@@ -277,3 +277,68 @@
     text-align: left;
   }
 }
+
+/* Irrigation Log */
+.irrigation {
+  margin-top: 14px;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.irrigation h3 {
+  margin: 0 0 12px;
+  color: #12301f;
+}
+
+.irrigation-empty {
+  margin: 0;
+  color: #3b4b43;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.irrigation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.irrigation-item {
+  display: grid;
+  grid-template-columns: 90px 90px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(46, 125, 50, 0.06);
+  border: 1px solid rgba(46, 125, 50, 0.14);
+  font-size: 13px;
+}
+
+.irrigation-time {
+  color: #3b4b43;
+  font-weight: 700;
+}
+
+.irrigation-type {
+  color: #12301f;
+  font-weight: 900;
+}
+
+.irrigation-change {
+  color: #1f3d2b;
+  font-weight: 800;
+  text-align: right;
+}
+
+@media (max-width: 520px) {
+  .irrigation-item {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 6px;
+  }
+
+  .irrigation-change {
+    text-align: left;
+  }
+}

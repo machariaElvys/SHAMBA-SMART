@@ -43,6 +43,9 @@ function Dashboard({ currentCrop, setCrops }) {
   // ✅ History (last 10 readings)
   const [history, setHistory] = useState([]);
 
+  // ✅ Irrigation log (last 5 events)
+  const [irrigationLog, setIrrigationLog] = useState([]);
+
   // ✅ Crop profile ranges (safe fallbacks)
   const idealMoisture = currentCrop.idealMoisture ?? { min: 55, max: 70 };
   const idealTemp = currentCrop.idealTemp ?? { min: 24, max: 32 };
@@ -57,6 +60,17 @@ function Dashboard({ currentCrop, setCrops }) {
         return { ...c, ...patch };
       })
     );
+  };
+
+  // ✅ push irrigation event to log
+  const pushLog = (type, before, after) => {
+    setIrrigationLog((prev) => {
+      const next = [
+        { id: crypto.randomUUID(), t: Date.now(), type, before, after },
+        ...prev,
+      ];
+      return next.slice(0, 5);
+    });
   };
 
   // ✅ Simulate sensors + time passing (every 3 seconds)
@@ -111,13 +125,18 @@ function Dashboard({ currentCrop, setCrops }) {
     }));
   }, [temperature, moisture, weather, currentCrop.id]);
 
-  // ✅ Auto-water (crop-aware)
+  // ✅ Auto-water (crop-aware) + logging
   useEffect(() => {
     if (!currentCrop.autoWater) return;
 
     const trigger = idealMoisture.min - 3; // slightly below target minimum
     if (moisture < trigger) {
-      setMoisture((m) => clamp(m + 15, 0, 100));
+      const before = moisture;
+      const after = clamp(moisture + 15, 0, 100);
+
+      setMoisture(after);
+      pushLog("Auto", before, after);
+
       updateCurrentCrop((c) => ({
         lastWateredMinutes: 0,
         health: clamp((c.health ?? 70) + 4, 0, 100),
@@ -125,8 +144,16 @@ function Dashboard({ currentCrop, setCrops }) {
     }
   }, [moisture, currentCrop.autoWater, currentCrop.id]);
 
+  // ✅ Manual water + logging
   const waterNow = () => {
-    setMoisture((m) => clamp(m + 12, 0, 100));
+    const before = moisture;
+
+    setMoisture((m) => {
+      const after = clamp(m + 12, 0, 100);
+      pushLog("Manual", before, after);
+      return after;
+    });
+
     updateCurrentCrop((c) => ({
       lastWateredMinutes: 0,
       health: clamp((c.health ?? 70) + 3, 0, 100),
@@ -154,6 +181,7 @@ function Dashboard({ currentCrop, setCrops }) {
   const tempTrend = trend(temperature, prevTemp);
   const moistTrend = trend(moisture, prevMoist);
 
+  // ✅ Stats
   const stats = [
     { id: 1, title: "Temperature", value: `${temperature}°C ${tempTrend}` },
     { id: 2, title: "Soil Moisture", value: `${moisture}% ${moistTrend}` },
@@ -216,9 +244,7 @@ function Dashboard({ currentCrop, setCrops }) {
               Auto Water: {currentCrop.autoWater ? "ON" : "OFF"}
             </button>
 
-            <p className="hint">
-              Auto-water triggers slightly below the crop’s target minimum.
-            </p>
+            <p className="hint">Auto-water triggers slightly below the crop’s target minimum.</p>
           </div>
         </div>
 
@@ -251,22 +277,47 @@ function Dashboard({ currentCrop, setCrops }) {
         </div>
       </div>
 
-      {/* ✅ Recent Readings (last 10) */}
-      <div className="history">
-        <h3>Recent Readings</h3>
+      {/* ✅ Recent Readings (store 10, show 5 for clean UI) */}
+      {history.length > 0 && (
+        <div className="history">
+          <h3>Recent Readings</h3>
 
-        <div className="history-list">
-          {history.slice(0,5).map((h) => (
-            <div className="history-item" key={h.t}>
-              <span className="history-time">
-                {new Date(h.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-              <span className="history-val">{h.moisture}%</span>
-              <span className="history-val">{h.temperature}°C</span>
-              <span className="history-weather">{h.weather}</span>
-            </div>
-          ))}
+          <div className="history-list">
+            {history.slice(0, 5).map((h) => (
+              <div className="history-item" key={h.t}>
+                <span className="history-time">
+                  {new Date(h.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
+                <span className="history-val">{h.moisture}%</span>
+                <span className="history-val">{h.temperature}°C</span>
+                <span className="history-weather">{h.weather}</span>
+              </div>
+            ))}
+          </div>
         </div>
+      )}
+
+      {/* ✅ Irrigation Log */}
+      <div className="irrigation">
+        <h3>Irrigation Log</h3>
+
+        {irrigationLog.length === 0 ? (
+          <p className="irrigation-empty">No irrigation events yet.</p>
+        ) : (
+          <div className="irrigation-list">
+            {irrigationLog.map((x) => (
+              <div className="irrigation-item" key={x.id}>
+                <span className="irrigation-time">
+                  {new Date(x.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
+                <span className="irrigation-type">{x.type}</span>
+                <span className="irrigation-change">
+                  {x.before}% → {x.after}%
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
