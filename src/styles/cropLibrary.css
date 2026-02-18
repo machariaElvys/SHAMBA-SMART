@@ -214,16 +214,29 @@
 }
 
 /* Button (disabled placeholder) */
-.lib-btn-outline {
+.lib-btn-outline{
+  cursor: default;
   padding: 10px 12px;
   border-radius: 10px;
   background: transparent;
-  color: #2e7d32;
+  color: #215f24;
   border: 2px solid #2e7d32;
   font-weight: 900;
-  cursor: not-allowed;
+  cursor: default;
   opacity: 0.6;
+
+  transition: transfrorm 140ms ease, box-shadow 140ms ease,background 140ms ease, border-color 140ms ease;
 }
+.lib-btn-outline:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+}
+.lib-btn-outline:focus-visible {
+outline: none;
+box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.22);
+}
+
+  
 
 /* Responsive */
 @media (max-width: 900px) {
