@@ -1,90 +1,162 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "../styles/cropLibrary.css";
-import { CROP_DICTIONARY } from "../data/cropDictionary";
 import { useToast } from "../components/ToastProvider";
+import {
+  fetchWikidataScientificName,
+  fetchWikipediaSummary,
+  searchWikipediaTitles,
+} from "../services/cropKnowledge";
 
 function normalize(v) {
   return String(v ?? "").toLowerCase().trim();
 }
 
-function matchesCrop(crop, query) {
-  const q = normalize(query);
-  if (!q) return false;
+/**
+ * These targets are for your app dashboard logic (not a public API).
+ * Keep them as "recommended targets", and users can customize in Crops page.
+ */
+const TARGETS = {
+  maize: { label: "Recommended (Maize)", idealMoisture: { min: 60, max: 75 }, idealTemp: { min: 26, max: 32 } },
+  tomato: { label: "Recommended (Tomato)", idealMoisture: { min: 55, max: 70 }, idealTemp: { min: 22, max: 30 } },
+  beans: { label: "Recommended (Beans)", idealMoisture: { min: 50, max: 65 }, idealTemp: { min: 18, max: 28 } },
+  sukuma: { label: "Recommended (Sukuma wiki)", idealMoisture: { min: 55, max: 70 }, idealTemp: { min: 18, max: 28 } },
+};
 
-  const name = normalize(crop.name);
-  const key = normalize(crop.key);
-  const scientificName = normalize(crop.scientificName);
+const DEFAULT_TARGETS = {
+  label: "Generic profile",
+  idealMoisture: { min: 55, max: 70 },
+  idealTemp: { min: 24, max: 32 },
+};
 
-  const aliases = Array.isArray(crop.aliases) ? crop.aliases.map(normalize) : [];
-
-  return (
-    name.includes(q) ||
-    key.includes(q) ||
-    scientificName.includes(q) ||
-    aliases.some((a) => a.includes(q))
-  );
-}
-
-function getBestMatch(query) {
-  const q = normalize(query);
-  if (!q) return null;
-
-  // exact match first
-  const exact = CROP_DICTIONARY.find((c) => {
-    const name = normalize(c.name);
-    const key = normalize(c.key);
-    const aliases = Array.isArray(c.aliases) ? c.aliases.map(normalize) : [];
-    return q === name || q === key || aliases.includes(q);
-  });
-  if (exact) return exact;
-
-  // partial match
-  return CROP_DICTIONARY.find((c) => matchesCrop(c, q)) ?? null;
+function targetsForTitle(title) {
+  const key = normalize(title);
+  return TARGETS[key] || DEFAULT_TARGETS;
 }
 
 function CropLibrary({ crops = [], setCrops, currentCropId }) {
   const { notify } = useToast();
 
   const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedTitle, setSelectedTitle] = useState("");
+  const [info, setInfo] = useState(null);
+  const [scientificName, setScientificName] = useState("");
 
-  const selected = useMemo(() => getBestMatch(query), [query]);
-
-  const suggestions = useMemo(() => {
-    const q = normalize(query);
-    if (!q) return CROP_DICTIONARY.slice(0, 8);
-    return CROP_DICTIONARY.filter((c) => matchesCrop(c, q)).slice(0, 8);
-  }, [query]);
+  const [loadingList, setLoadingList] = useState(false);
+  const [loadingInfo, setLoadingInfo] = useState(false);
+  const [error, setError] = useState("");
 
   const currentCrop = useMemo(() => {
     if (!currentCropId) return null;
     return crops.find((c) => c.id === currentCropId) || null;
   }, [crops, currentCropId]);
 
-  const applyToCurrentCrop = () => {
-    if (!selected) {
-      notify("Search and select a crop first.", "warning");
+  const selectedTargets = useMemo(() => {
+    if (!selectedTitle) return DEFAULT_TARGETS;
+    return targetsForTitle(selectedTitle);
+  }, [selectedTitle]);
+
+  useEffect(() => {
+    const q = query.trim();
+    setError("");
+
+    if (!q) {
+      setSuggestions([
+        { title: "Maize" },
+        { title: "Beans" },
+        { title: "Tomato" },
+        { title: "Sukuma wiki" },
+      ]);
+      setSelectedTitle("");
+      setInfo(null);
+      setScientificName("");
       return;
     }
 
+    const id = window.setTimeout(async () => {
+      try {
+        setLoadingList(true);
+        const results = await searchWikipediaTitles(q, 8);
+        setSuggestions(results);
+
+        if (results.length > 0) {
+          setSelectedTitle(results[0].title);
+        } else {
+          setSelectedTitle("");
+          setInfo(null);
+          setScientificName("");
+        }
+      } catch (e) {
+        setSuggestions([]);
+        setSelectedTitle("");
+        setInfo(null);
+        setScientificName("");
+        setError("Could not fetch results. Check your internet connection.");
+      } finally {
+        setLoadingList(false);
+      }
+    }, 350);
+
+    return () => window.clearTimeout(id);
+  }, [query]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDetails() {
+      const t = selectedTitle.trim();
+      if (!t) return;
+
+      try {
+        setLoadingInfo(true);
+        setError("");
+
+        const summary = await fetchWikipediaSummary(t);
+        if (cancelled) return;
+
+        setInfo(summary || null);
+
+        const sci = await fetchWikidataScientificName(summary?.wikibaseItem || "");
+        if (cancelled) return;
+
+        setScientificName(sci || "");
+      } catch (e) {
+        if (!cancelled) {
+          setInfo(null);
+          setScientificName("");
+          setError("Could not load crop details right now.");
+        }
+      } finally {
+        if (!cancelled) setLoadingInfo(false);
+      }
+    }
+
+    loadDetails();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTitle]);
+
+  const applyToCurrentCrop = () => {
     if (!currentCropId || !currentCrop) {
       notify("Add a crop and set it as current first.", "warning");
       return;
     }
 
-    if (typeof setCrops !== "function") {
-      notify("Cannot apply profile. setCrops is missing.", "error");
+    if (!selectedTitle) {
+      notify("Search and select a crop first.", "warning");
       return;
     }
-
-    // Build a clean profile object from dictionary item
-    const profileLabel = selected.label || `${selected.name} profile`;
-    const idealMoisture = selected.idealMoisture ?? { min: 55, max: 70 };
-    const idealTemp = selected.idealTemp ?? { min: 24, max: 32 };
 
     setCrops((prev) =>
       prev.map((c) =>
         c.id === currentCropId
-          ? { ...c, profileLabel, idealMoisture, idealTemp }
+          ? {
+              ...c,
+              profileLabel: selectedTargets.label,
+              idealMoisture: selectedTargets.idealMoisture,
+              idealTemp: selectedTargets.idealTemp,
+            }
           : c
       )
     );
@@ -96,9 +168,9 @@ function CropLibrary({ crops = [], setCrops, currentCropId }) {
     <div className="lib-page">
       <header className="lib-hero">
         <p className="lib-kicker">Crop Library</p>
-        <h1 className="lib-title">Search a crop and get practical insights.</h1>
+        <h1 className="lib-title">Search a crop and get reliable facts.</h1>
         <p className="lib-subtitle">
-          Use this dictionary to learn ideal ranges and apply a profile to your current crop.
+          Crop details come from Wikipedia and Wikidata. Dashboard targets can be applied as a profile.
         </p>
       </header>
 
@@ -113,21 +185,26 @@ function CropLibrary({ crops = [], setCrops, currentCropId }) {
             className="lib-input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. Maize, Beans, Tomato, Sukuma"
+            placeholder="Type a crop name"
           />
 
           <div className="lib-suggestions">
-            <p className="lib-small-title">{normalize(query) ? "Matches" : "Popular"}</p>
+            <p className="lib-small-title">
+              {loadingList ? "Searching..." : query.trim() ? "Matches" : "Popular"}
+            </p>
 
             <div className="lib-chip-wrap">
               {suggestions.map((c) => (
                 <button
-                  key={c.key}
-                  className="lib-chip"
+                  key={c.title}
+                  className={`lib-chip ${c.title === selectedTitle ? "active" : ""}`}
                   type="button"
-                  onClick={() => setQuery(c.name)}
+                  onClick={() => {
+                    setSelectedTitle(c.title);
+                    setQuery(c.title);
+                  }}
                 >
-                  {c.name}
+                  {c.title}
                 </button>
               ))}
             </div>
@@ -151,42 +228,39 @@ function CropLibrary({ crops = [], setCrops, currentCropId }) {
             </p>
           </div>
 
-          {normalize(query) && !selected && (
+          {error && (
             <div className="lib-empty">
-              <p className="lib-empty-title">No match found</p>
-              <p className="lib-empty-text">
-                Try a different name or choose from the suggestions.
-              </p>
+              <p className="lib-empty-title">Notice</p>
+              <p className="lib-empty-text">{error}</p>
             </div>
           )}
         </aside>
 
         <main className="lib-result">
-          {!normalize(query) && (
+          {!query.trim() && (
             <div className="lib-placeholder">
               <h2>Start typing a crop name</h2>
-              <p>
-                You will see ideal ranges, watering guidance, and you can apply a profile to your
-                current crop.
-              </p>
+              <p>We will fetch a short description and show references. Then you can apply targets to your dashboard.</p>
             </div>
           )}
 
-          {selected && (
+          {loadingInfo && query.trim() && (
+            <div className="lib-placeholder">
+              <h2>Loading crop details</h2>
+              <p>Please wait a moment.</p>
+            </div>
+          )}
+
+          {info && !loadingInfo && (
             <div className="lib-card">
               <div className="lib-card-head">
                 <div>
-                  <h2 className="lib-crop-name">{selected.name}</h2>
+                  <h2 className="lib-crop-name">{info.title}</h2>
 
                   <p className="lib-meta">
-                    {selected.scientificName ? (
-                      <span className="lib-meta-item">{selected.scientificName}</span>
-                    ) : null}
-
-                    {Array.isArray(selected.aliases) && selected.aliases.length ? (
-                      <span className="lib-meta-item">
-                        Also known as: {selected.aliases.join(", ")}
-                      </span>
+                    {info.description ? <span className="lib-meta-item">{info.description}</span> : null}
+                    {scientificName ? (
+                      <span className="lib-meta-item">Scientific name: {scientificName}</span>
                     ) : null}
                   </p>
                 </div>
@@ -196,68 +270,47 @@ function CropLibrary({ crops = [], setCrops, currentCropId }) {
                   className="lib-btn-outline"
                   onClick={applyToCurrentCrop}
                   disabled={!currentCropId}
-                  title={
-                    !currentCropId
-                      ? "Add a crop first and set it as current."
-                      : "Apply this profile to your current crop."
-                  }
+                  title={!currentCropId ? "Add a crop first and set it as current." : "Apply targets to your current crop."}
                 >
                   Apply to Current Crop
                 </button>
               </div>
 
-              {selected.overview ? <p className="lib-overview">{selected.overview}</p> : null}
+              <div className="lib-top">
+                {info.thumbnail ? (
+                  <img className="lib-thumb" src={info.thumbnail} alt={info.title} />
+                ) : null}
+
+                <div className="lib-text">
+                  {info.extract ? <p className="lib-overview">{info.extract}</p> : null}
+
+                  {info.pageUrl ? (
+                    <a className="lib-link" href={info.pageUrl} target="_blank" rel="noreferrer">
+                      Open reference
+                    </a>
+                  ) : null}
+                </div>
+              </div>
 
               <div className="lib-grid">
                 <div className="lib-panel">
-                  <h3>Ideal Soil Moisture</h3>
+                  <h3>Dashboard target soil moisture</h3>
                   <p className="lib-range">
-                    {selected.idealMoisture?.min ?? 55}–{selected.idealMoisture?.max ?? 70}%
+                    {selectedTargets.idealMoisture.min}–{selectedTargets.idealMoisture.max}%
                   </p>
-                  {selected.idealMoisture?.note ? (
-                    <p className="lib-note">{selected.idealMoisture.note}</p>
-                  ) : null}
+                  <p className="lib-note">
+                    This is a recommended target profile for your dashboard logic. You can customize per crop in Crops.
+                  </p>
                 </div>
 
                 <div className="lib-panel">
-                  <h3>Ideal Temperature</h3>
+                  <h3>Dashboard target temperature</h3>
                   <p className="lib-range">
-                    {selected.idealTemp?.min ?? 24}–{selected.idealTemp?.max ?? 32}°C
+                    {selectedTargets.idealTemp.min}–{selectedTargets.idealTemp.max}°C
                   </p>
-                  {selected.idealTemp?.note ? (
-                    <p className="lib-note">{selected.idealTemp.note}</p>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="lib-split">
-                <div className="lib-panel">
-                  <h3>Watering Tips</h3>
-                  <ul className="lib-list">
-                    {(selected.wateringTips ?? []).map((x) => (
-                      <li key={x}>{x}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="lib-panel">
-                  <h3>Growth Notes</h3>
-                  <ul className="lib-list">
-                    {(selected.growthNotes ?? []).map((x) => (
-                      <li key={x}>{x}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              <div className="lib-panel">
-                <h3>Common Issues</h3>
-                <div className="lib-tags">
-                  {(selected.commonIssues ?? []).map((x) => (
-                    <span className="lib-tag" key={x}>
-                      {x}
-                    </span>
-                  ))}
+                  <p className="lib-note">
+                    This is a recommended target profile for your dashboard logic. You can customize per crop in Crops.
+                  </p>
                 </div>
               </div>
 
