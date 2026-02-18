@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import StatCard from "../components/StatCard";
 import "../styles/dashboard.css";
+import { fetchCurrentWeather } from "../services/weather";
+import { reverseGeocodeLabel } from "../services/geocode";
 
 function clamp(num, min, max) {
   return Math.max(min, Math.min(max, num));
@@ -26,7 +28,6 @@ function Dashboard({ currentCrop, setCrops }) {
     return (
       <div className="dashboard">
         <h1>Farm Dashboard</h1>
-
         <div className="farm-status">
           <h2>No crops yet</h2>
           <p>Go to the Crops page and add your first crop to start monitoring.</p>
@@ -38,19 +39,28 @@ function Dashboard({ currentCrop, setCrops }) {
   // Sensors
   const [temperature, setTemperature] = useState(28);
   const [moisture, setMoisture] = useState(65);
-  const [weather, setWeather] = useState("Sunny");
+  const [weather, setWeather] = useState("Clear");
 
-  // ✅ History (store last 10 readings)
+  // Weather source (default: Nairobi)
+  const [location, setLocation] = useState({
+    label: "Nairobi",
+    lat: -1.286389,
+    lon: 36.817223,
+  });
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState("");
+
+  // History (store last 10 readings)
   const [history, setHistory] = useState([]);
 
-  // ✅ Irrigation log (store last 5 events) - NOT persisted, just session
+  // Irrigation log (store last 5 events)
   const [irrigationLog, setIrrigationLog] = useState([]);
 
-  // ✅ Controls
+  // Controls
   const [paused, setPaused] = useState(false);
   const [tickMs, setTickMs] = useState(3000);
 
-  // ✅ Crop profile ranges (safe fallbacks)
+  // Crop profile ranges (safe fallbacks)
   const idealMoisture = currentCrop.idealMoisture ?? { min: 55, max: 70 };
   const idealTemp = currentCrop.idealTemp ?? { min: 24, max: 32 };
   const profileLabel = currentCrop.profileLabel ?? "Generic profile";
@@ -66,7 +76,7 @@ function Dashboard({ currentCrop, setCrops }) {
     );
   };
 
-  // ✅ push irrigation event to log
+  // push irrigation event to log
   const pushLog = (type, before, after) => {
     setIrrigationLog((prev) => {
       const next = [
@@ -77,39 +87,109 @@ function Dashboard({ currentCrop, setCrops }) {
     });
   };
 
-  // ✅ Simulate sensors + time passing
+  // Use my location (browser permission)
+const useMyLocation = () => {
+  setWeatherError("");
+
+  if (!navigator.geolocation) {
+    setWeatherError("Geolocation not supported on this browser.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const { latitude, longitude } = pos.coords;
+
+      // Temporary label while we fetch the real name
+      setLocation({
+        label: "Locating…",
+        lat: latitude,
+        lon: longitude,
+      });
+
+      try {
+        const placeName = await reverseGeocodeLabel(latitude, longitude);
+
+        setLocation({
+          label: placeName,     
+          lat: latitude,
+          lon: longitude,
+        });
+      } catch {
+        // If reverse geocode fails, fall back gracefully
+        setLocation({
+          label: "My location",
+          lat: latitude,
+          lon: longitude,
+        });
+      }
+    },
+    () => {
+      setWeatherError("Location permission denied. Using Nairobi (default).");
+    },
+    { enableHighAccuracy: false, timeout: 8000 }
+  );
+};
+
+  // ✅ Real weather fetch (every 15 minutes)
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadWeather() {
+      try {
+        setWeatherLoading(true);
+        setWeatherError("");
+
+        const w = await fetchCurrentWeather(location.lat, location.lon);
+        if (cancelled) return;
+
+        if (typeof w.temperature === "number") setTemperature(w.temperature);
+        if (typeof w.weather === "string") setWeather(w.weather);
+      } catch {
+        if (!cancelled) {
+          setWeatherError("Failed to load live weather. Keeping last known values.");
+        }
+      } finally {
+        if (!cancelled) setWeatherLoading(false);
+      }
+    }
+
+    loadWeather();
+    const id = setInterval(loadWeather, 1000 * 60 * 15);
+
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [location.lat, location.lon]);
+
+  // ✅ Simulate moisture + time passing (NO random temp/weather anymore)
   useEffect(() => {
     if (paused) return;
 
     const interval = setInterval(() => {
-      const newTemp = Math.floor(Math.random() * 11) + 25; // 25–35
       const newMoisture = Math.floor(Math.random() * 41) + 40; // 40–80
-      const weathers = ["Sunny", "Cloudy", "Rainy"];
-      const newWeather = weathers[Math.floor(Math.random() * weathers.length)];
-
-      setTemperature(newTemp);
       setMoisture(newMoisture);
-      setWeather(newWeather);
 
-      // Save reading to history (keep last 10)
+      // Save reading to history (keep last 10) - use current state for temp/weather
       setHistory((prev) => {
         const next = [
-          { t: Date.now(), temperature: newTemp, moisture: newMoisture, weather: newWeather },
+          { t: Date.now(), temperature, moisture: newMoisture, weather },
           ...prev,
         ];
         return next.slice(0, 10);
       });
 
-      // time passing
+      // time passing (note: your field name is minutes, but tick is seconds-ish)
       updateCurrentCrop((c) => ({
         lastWateredMinutes: (c.lastWateredMinutes ?? 0) + Math.round(tickMs / 1000),
       }));
     }, tickMs);
 
     return () => clearInterval(interval);
-  }, [currentCrop.id, tickMs, paused]);
+  }, [currentCrop.id, tickMs, paused, temperature, weather]);
 
-  // ✅ Crop-aware health logic
+  //Crop-aware health logic
   useEffect(() => {
     let delta = 0;
 
@@ -121,12 +201,21 @@ function Dashboard({ currentCrop, setCrops }) {
     else if (temperature > idealTemp.max) delta -= 2;
     else delta += 1;
 
-    if (weather === "Rainy" && moisture < idealMoisture.min) delta += 1;
+    if ((weather === "Rain" || weather === "Showers") && moisture < idealMoisture.min) delta += 1;
 
     updateCurrentCrop((c) => ({
       health: clamp((c.health ?? 70) + delta, 0, 100),
     }));
-  }, [temperature, moisture, weather, currentCrop.id]);
+  }, [
+    temperature,
+    moisture,
+    weather,
+    currentCrop.id,
+    idealMoisture.min,
+    idealMoisture.max,
+    idealTemp.min,
+    idealTemp.max,
+  ]);
 
   // ✅ Auto-water + logging
   useEffect(() => {
@@ -145,9 +234,9 @@ function Dashboard({ currentCrop, setCrops }) {
         health: clamp((c.health ?? 70) + 4, 0, 100),
       }));
     }
-  }, [moisture, currentCrop.autoWater, currentCrop.id]);
+  }, [moisture, currentCrop.autoWater, currentCrop.id, idealMoisture.min]);
 
-  // ✅ Manual water + logging
+  // Manual water + logging
   const waterNow = () => {
     const before = moisture;
 
@@ -176,9 +265,17 @@ function Dashboard({ currentCrop, setCrops }) {
     if (moisture > idealMoisture.max) a++;
     if ((currentCrop.health ?? 70) < 40) a++;
     return a;
-  }, [temperature, moisture, currentCrop.health, idealMoisture, idealTemp]);
+  }, [
+    temperature,
+    moisture,
+    currentCrop.health,
+    idealMoisture.min,
+    idealMoisture.max,
+    idealTemp.min,
+    idealTemp.max,
+  ]);
 
-  // Trends
+  // Trends (previous reading)
   const prevTemp = history[1]?.temperature;
   const prevMoist = history[1]?.moisture;
   const tempTrend = trend(temperature, prevTemp);
@@ -197,13 +294,28 @@ function Dashboard({ currentCrop, setCrops }) {
     <div className="dashboard">
       <h1>Farm Dashboard</h1>
 
+      {/*  Weather source block (must be INSIDE the return JSX) */}
+      <div style={{ marginTop: 10, fontSize: 13, opacity: 0.85 }}>
+        <strong>Weather source:</strong> {location.label}{" "}
+        {weatherLoading ? "• loading…" : ""}
+        {weatherError ? `• ${weatherError}` : ""}
+        <button
+          className="btn btn-outline"
+          style={{ marginLeft: 10, padding: "8px 10px" }}
+          onClick={useMyLocation}
+          type="button"
+        >
+           my location
+        </button>
+      </div>
+
       <div className="stats-grid">
         {stats.map((s) => (
           <StatCard key={s.id} title={s.title} value={s.value} />
         ))}
       </div>
 
-      {/* ✅ Simulation Controls */}
+      {/* Simulation Controls */}
       <div className="controls">
         <div className="controls-left">
           <h3>Simulation Controls</h3>
@@ -296,13 +408,15 @@ function Dashboard({ currentCrop, setCrops }) {
                 Temperature is too low for {currentCrop.name} (min {idealTemp.min}°C).
               </li>
             )}
-            {weather === "Rainy" && <li>Rain detected — moisture may improve.</li>}
+            {(weather === "Rain" || weather === "Showers") && (
+              <li>Rain detected — moisture may improve.</li>
+            )}
             {alerts === 0 && <li>Conditions look stable. Keep monitoring.</li>}
           </ul>
         </div>
       </div>
 
-      {/* ✅ Recent Readings (store 10, show 5) */}
+      {/*  Recent Readings (store 10, show 5) */}
       {history.length > 0 && (
         <div className="history">
           <h3>Recent Readings</h3>
@@ -321,7 +435,7 @@ function Dashboard({ currentCrop, setCrops }) {
         </div>
       )}
 
-      {/* ✅ Irrigation Log */}
+      {/* Irrigation Log */}
       <div className="irrigation">
         <h3>Irrigation Log</h3>
 
