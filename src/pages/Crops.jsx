@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "../styles/crops.css";
+import { useToast } from "../components/ToastProvider";
 
 // Preset profiles (expand anytime)
 const CROP_PROFILES = {
@@ -37,15 +38,23 @@ function getProfileForName(name) {
 }
 
 function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
+  const { notify } = useToast();
+
   const [name, setName] = useState("");
   const [stage, setStage] = useState("Seedling");
   const [editingId, setEditingId] = useState(null);
+
+  // Custom confirm modal state
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const addCrop = (e) => {
     e.preventDefault();
 
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      notify("Please enter a crop name.", "warning");
+      return;
+    }
 
     const profile = getProfileForName(trimmed);
 
@@ -64,6 +73,9 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
 
     setCrops((prev) => [newCrop, ...prev]);
     setCurrentCropId(newCrop.id);
+
+    notify(`Added crop: ${trimmed}.`, "success");
+
     setName("");
     setStage("Seedling");
     setEditingId(null);
@@ -73,24 +85,52 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
     setCrops((prev) => prev.map((c) => (c.id === cropId ? updater(c) : c)));
   };
 
-  const removeCrop = (cropId) => {
-    // optional: confirm delete
-    const ok = window.confirm("Remove this crop?");
-    if (!ok) return;
+  const setCurrent = (crop) => {
+    setCurrentCropId(crop.id);
+    notify(`Current crop set to: ${crop.name}.`, "info");
+  };
 
-    setCrops((prev) => {
-      const next = prev.filter((c) => c.id !== cropId);
+  const toggleEdit = (crop) => {
+    const isEditing = editingId === crop.id;
 
-      // if the removed crop was current, pick a new current
-      if (cropId === currentCropId) {
-        const newCurrent = next[0]?.id ?? null;
-        setCurrentCropId(newCurrent);
-      }
+    if (isEditing) {
+      setEditingId(null);
+      notify(`Saved profile changes for: ${crop.name}.`, "success");
+    } else {
+      setEditingId(crop.id);
+      notify(`Editing profile for: ${crop.name}.`, "info");
+    }
+  };
 
-      return next;
-    });
+  // Open custom confirm modal
+  const askRemove = (crop) => {
+    setDeleteTarget(crop);
+  };
+
+  // Confirm remove
+  const confirmRemove = () => {
+    if (!deleteTarget) return;
+
+    const cropId = deleteTarget.id;
+
+    setCrops((prev) => prev.filter((c) => c.id !== cropId));
+
+    // If removed crop was current, pick a new current safely
+    if (cropId === currentCropId) {
+      const remaining = crops.filter((c) => c.id !== cropId);
+      setCurrentCropId(remaining[0]?.id ?? null);
+    }
 
     if (editingId === cropId) setEditingId(null);
+
+    notify(`Removed crop: ${deleteTarget.name}.`, "info");
+    setDeleteTarget(null);
+  };
+
+  // Cancel remove
+  const cancelRemove = () => {
+    setDeleteTarget(null);
+    notify("Removal cancelled.", "info");
   };
 
   return (
@@ -119,7 +159,7 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
         </div>
 
         <button className="crop-btn" type="submit">
-          Add Crop ➕
+          Add Crop
         </button>
       </form>
 
@@ -134,11 +174,13 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
             >
               <div className="crop-info">
                 <h3>{crop.name}</h3>
-                <p>Stage: {crop.stage} • Health: {crop.health}/100</p>
+                <p>
+                  Stage: {crop.stage} • Health: {crop.health}/100
+                </p>
 
                 <p className="profile-line">
-                  Profile: {crop.profileLabel} • Moisture {crop.idealMoisture.min}-{crop.idealMoisture.max}% • Temp{" "}
-                  {crop.idealTemp.min}-{crop.idealTemp.max}°C
+                  Profile: {crop.profileLabel} • Moisture {crop.idealMoisture.min}-
+                  {crop.idealMoisture.max}% • Temp {crop.idealTemp.min}-{crop.idealTemp.max}°C
                 </p>
 
                 {isEditing && (
@@ -219,20 +261,18 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
               </div>
 
               <div className="crop-actions">
-                <button className="set-btn" onClick={() => setCurrentCropId(crop.id)}>
-                  {crop.id === currentCropId ? "Current ✅" : "Set Current"}
+                <button className="set-btn" type="button" onClick={() => setCurrent(crop)}>
+                  {crop.id === currentCropId ? "Current" : "Set Current"}
                 </button>
 
-                <button
-                  className="edit-btn"
-                  onClick={() => setEditingId(isEditing ? null : crop.id)}
-                >
+                <button className="edit-btn" type="button" onClick={() => toggleEdit(crop)}>
                   {isEditing ? "Done" : "Edit Profile"}
                 </button>
 
                 <button
                   className="delete-btn"
-                  onClick={() => removeCrop(crop.id)}
+                  type="button"
+                  onClick={() => askRemove(crop)}
                   title="Remove crop"
                 >
                   Remove
@@ -242,9 +282,29 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
           );
         })}
       </div>
+
+      {/* Custom confirm modal */}
+      {deleteTarget && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <h3 className="modal-title">Remove crop</h3>
+            <p className="modal-text">
+              Are you sure you want to remove "{deleteTarget.name}"?
+            </p>
+
+            <div className="modal-actions">
+              <button className="btn btn-outline" type="button" onClick={cancelRemove}>
+                Cancel
+              </button>
+              <button className="btn" type="button" onClick={confirmRemove}>
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default Crops;
-

@@ -3,7 +3,7 @@ import { Routes, Route } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-
+import { ToastProvider } from "./components/ToastProvider";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Crops from "./pages/Crops";
@@ -15,6 +15,7 @@ const STORAGE_KEY = "shambaSmart.crops.v1";
 const STORAGE_CURRENT_KEY = "shambaSmart.currentCropId.v1";
 
 function App() {
+  
   // ✅ load crops from localStorage (or start empty)
   const [crops, setCrops] = useState(() => {
     try {
@@ -61,7 +62,9 @@ function App() {
   }, [crops, currentCropId]);
 
   return (
+    <ToastProvider>
     <div>
+      
       <Navbar />
 
       <main>
@@ -104,6 +107,7 @@ function App() {
 
       <Footer />
     </div>
+    </ToastProvider>
   );
 }
 
