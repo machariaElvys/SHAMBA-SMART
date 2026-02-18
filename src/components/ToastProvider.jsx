@@ -13,7 +13,7 @@ export function ToastProvider({ children }) {
   const notify = useCallback(
     (message, type = "info", options = {}) => {
       const id = crypto.randomUUID();
-      const duration = typeof options.duration === "number" ? options.duration : 2600;
+      const duration = typeof options.duration === "number" ? options.duration : 2000;
 
       const toast = {
         id,
