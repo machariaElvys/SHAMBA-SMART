@@ -43,9 +43,19 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
   const [name, setName] = useState("");
   const [stage, setStage] = useState("Seedling");
   const [editingId, setEditingId] = useState(null);
+  const [lastRemoved, setLastRemoved] = useState(null);
 
   // Custom confirm modal state
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+
+
+function insertAt(arr, index, item) {
+  const next = arr.slice();
+  const safe = Math.max(0, Math.min(index, next.length));
+  next.splice(safe, 0, item);
+  return next;
+}
 
   const addCrop = (e) => {
     e.preventDefault();
@@ -109,23 +119,39 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
 
   // Confirm remove
   const confirmRemove = () => {
-    if (!deleteTarget) return;
+  if (!deleteTarget) return;
 
-    const cropId = deleteTarget.id;
+  const cropId = deleteTarget.id;
+  const removedIndex = crops.findIndex((c) => c.id === cropId);
+  const wasCurrent = cropId === currentCropId;
 
-    setCrops((prev) => prev.filter((c) => c.id !== cropId));
+  setLastRemoved({
+    crop: deleteTarget,
+    index: removedIndex,
+    wasCurrent,
+  });
 
-    // If removed crop was current, pick a new current safely
-    if (cropId === currentCropId) {
-      const remaining = crops.filter((c) => c.id !== cropId);
-      setCurrentCropId(remaining[0]?.id ?? null);
-    }
+  setCrops((prev) => prev.filter((c) => c.id !== cropId));
 
-    if (editingId === cropId) setEditingId(null);
+  if (wasCurrent) {
+    const remaining = crops.filter((c) => c.id !== cropId);
+    setCurrentCropId(remaining[0]?.id ?? null);
+  }
 
-    notify(`Removed crop: ${deleteTarget.name}.`, "info");
-    setDeleteTarget(null);
-  };
+  if (editingId === cropId) setEditingId(null);
+
+  notify(`Removed crop: ${deleteTarget.name}.`, "info", {
+    duration: 5000,
+    actionLabel: "Undo",
+    onAction: () => {
+      setCrops((prev) => insertAt(prev, removedIndex, deleteTarget));
+      if (wasCurrent) setCurrentCropId(deleteTarget.id);
+      notify(`Restored crop: ${deleteTarget.name}.`, "success");
+    },
+  });
+
+  setDeleteTarget(null);
+};
 
   // Cancel remove
   const cancelRemove = () => {

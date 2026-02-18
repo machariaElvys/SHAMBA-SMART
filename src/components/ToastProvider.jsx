@@ -10,15 +10,25 @@ export function ToastProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const notify = useCallback((message, type = "info", options = {}) => {
-    const id = crypto.randomUUID();
-    const duration = typeof options.duration === "number" ? options.duration : 2600;
+  const notify = useCallback(
+    (message, type = "info", options = {}) => {
+      const id = crypto.randomUUID();
+      const duration = typeof options.duration === "number" ? options.duration : 2600;
 
-    const toast = { id, message, type, duration };
-    setToasts((prev) => [toast, ...prev].slice(0, 4));
+      const toast = {
+        id,
+        message,
+        type,
+        duration,
+        actionLabel: options.actionLabel || "",
+        onAction: typeof options.onAction === "function" ? options.onAction : null,
+      };
 
-    window.setTimeout(() => remove(id), duration);
-  }, [remove]);
+      setToasts((prev) => [toast, ...prev].slice(0, 4));
+      window.setTimeout(() => remove(id), duration);
+    },
+    [remove]
+  );
 
   const value = useMemo(() => ({ notify }), [notify]);
 
@@ -31,20 +41,33 @@ export function ToastProvider({ children }) {
           <div key={t.id} className={`toast toast-${t.type}`}>
             <div className="toast-body">
               <p className="toast-text">{t.message}</p>
-              <button
-                type="button"
-                className="toast-close"
-                onClick={() => remove(t.id)}
-                aria-label="Close notification"
-              >
-                ×
-              </button>
+
+              <div className="toast-actions">
+                {t.actionLabel && t.onAction && (
+                  <button
+                    type="button"
+                    className="toast-action"
+                    onClick={() => {
+                      t.onAction();
+                      remove(t.id);
+                    }}
+                  >
+                    {t.actionLabel}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="toast-close"
+                  onClick={() => remove(t.id)}
+                  aria-label="Close notification"
+                >
+                  ×
+                </button>
+              </div>
             </div>
 
-            <div
-              className="toast-bar"
-              style={{ animationDuration: `${t.duration}ms` }}
-            />
+            <div className="toast-bar" style={{ animationDuration: `${t.duration}ms` }} />
           </div>
         ))}
       </div>
