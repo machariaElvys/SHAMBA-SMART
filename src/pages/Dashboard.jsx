@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import StatCard from "../components/StatCard";
 import "../styles/dashboard.css";
+
 import { fetchCurrentWeather } from "../services/weather";
 import { reverseGeocodeLabel } from "../services/geocode";
+import { fetchSoilMoisturePercent } from "../services/soilMoisture";
 
 function clamp(num, min, max) {
   return Math.max(min, Math.min(max, num));
@@ -23,7 +25,6 @@ function trend(current, previous) {
 }
 
 function Dashboard({ currentCrop, setCrops }) {
-  // ✅ Guard: if user removed all crops
   if (!currentCrop) {
     return (
       <div className="dashboard">
@@ -36,36 +37,42 @@ function Dashboard({ currentCrop, setCrops }) {
     );
   }
 
-  // Sensors
+  // Sensor states
   const [temperature, setTemperature] = useState(28);
   const [moisture, setMoisture] = useState(65);
   const [weather, setWeather] = useState("Clear");
 
-  // Weather source (default: Nairobi)
+  // Location
   const [location, setLocation] = useState({
     label: "Nairobi",
     lat: -1.286389,
     lon: 36.817223,
   });
+
+  // Weather status
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
 
-  // History (store last 10 readings)
+  // Soil moisture status
+  const [moistureLoading, setMoistureLoading] = useState(false);
+  const [moistureError, setMoistureError] = useState("");
+
+  // History (last 10)
   const [history, setHistory] = useState([]);
 
-  // Irrigation log (store last 5 events)
+  // Irrigation log (last 5)
   const [irrigationLog, setIrrigationLog] = useState([]);
 
   // Controls
   const [paused, setPaused] = useState(false);
   const [tickMs, setTickMs] = useState(3000);
 
-  // Crop profile ranges (safe fallbacks)
+  // Crop profile ranges
   const idealMoisture = currentCrop.idealMoisture ?? { min: 55, max: 70 };
   const idealTemp = currentCrop.idealTemp ?? { min: 24, max: 32 };
   const profileLabel = currentCrop.profileLabel ?? "Generic profile";
 
-  // helper to update only current crop in crops array
+  // Update only current crop
   const updateCurrentCrop = (patchOrFn) => {
     setCrops((prev) =>
       prev.map((c) => {
@@ -76,7 +83,7 @@ function Dashboard({ currentCrop, setCrops }) {
     );
   };
 
-  // push irrigation event to log
+  // Log irrigation event
   const pushLog = (type, before, after) => {
     setIrrigationLog((prev) => {
       const next = [
@@ -87,51 +94,57 @@ function Dashboard({ currentCrop, setCrops }) {
     });
   };
 
-  // Use my location (browser permission)
-const useMyLocation = () => {
-  setWeatherError("");
+  // Keep latest sensor values without restarting intervals
+  const tempRef = useRef(temperature);
+  const moistRef = useRef(moisture);
+  const weatherRef = useRef(weather);
 
-  if (!navigator.geolocation) {
-    setWeatherError("Geolocation not supported on this browser.");
-    return;
-  }
+  useEffect(() => {
+    tempRef.current = temperature;
+  }, [temperature]);
 
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      const { latitude, longitude } = pos.coords;
+  useEffect(() => {
+    moistRef.current = moisture;
+  }, [moisture]);
 
-      // Temporary label while we fetch the real name
-      setLocation({
-        label: "Locating…",
-        lat: latitude,
-        lon: longitude,
-      });
+  useEffect(() => {
+    weatherRef.current = weather;
+  }, [weather]);
 
-      try {
-        const placeName = await reverseGeocodeLabel(latitude, longitude);
+  // Use my location (reverse geocode for readable name)
+  const useMyLocation = () => {
+    setWeatherError("");
+
+    if (!navigator.geolocation) {
+      setWeatherError("Geolocation not supported on this browser.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
 
         setLocation({
-          label: placeName,     
+          label: "Locating...",
           lat: latitude,
           lon: longitude,
         });
-      } catch {
-        // If reverse geocode fails, fall back gracefully
-        setLocation({
-          label: "My location",
-          lat: latitude,
-          lon: longitude,
-        });
-      }
-    },
-    () => {
-      setWeatherError("Location permission denied. Using Nairobi (default).");
-    },
-    { enableHighAccuracy: false, timeout: 8000 }
-  );
-};
 
-  // ✅ Real weather fetch (every 15 minutes)
+        try {
+          const placeName = await reverseGeocodeLabel(latitude, longitude);
+          setLocation({ label: placeName, lat: latitude, lon: longitude });
+        } catch {
+          setLocation({ label: "My location", lat: latitude, lon: longitude });
+        }
+      },
+      () => {
+        setWeatherError("Location permission denied. Using Nairobi (default).");
+      },
+      { enableHighAccuracy: false, timeout: 8000 }
+    );
+  };
+
+  // Fetch real weather every 15 minutes
   useEffect(() => {
     let cancelled = false;
 
@@ -163,33 +176,64 @@ const useMyLocation = () => {
     };
   }, [location.lat, location.lon]);
 
-  // ✅ Simulate moisture + time passing (NO random temp/weather anymore)
+  // Fetch soil moisture every 30 minutes
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMoisture() {
+      try {
+        setMoistureLoading(true);
+        setMoistureError("");
+
+        const m = await fetchSoilMoisturePercent(location.lat, location.lon);
+        if (cancelled) return;
+
+        setMoisture(m.percent);
+      } catch {
+        if (!cancelled) {
+          setMoistureError("Failed to load live soil moisture. Keeping last known values.");
+        }
+      } finally {
+        if (!cancelled) setMoistureLoading(false);
+      }
+    }
+
+    loadMoisture();
+    const id = setInterval(loadMoisture, 1000 * 60 * 30);
+
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [location.lat, location.lon]);
+
+  // Interval for time passing + history snapshots
   useEffect(() => {
     if (paused) return;
 
     const interval = setInterval(() => {
-      const newMoisture = Math.floor(Math.random() * 41) + 40; // 40–80
-      setMoisture(newMoisture);
-
-      // Save reading to history (keep last 10) - use current state for temp/weather
       setHistory((prev) => {
         const next = [
-          { t: Date.now(), temperature, moisture: newMoisture, weather },
+          {
+            t: Date.now(),
+            temperature: tempRef.current,
+            moisture: moistRef.current,
+            weather: weatherRef.current,
+          },
           ...prev,
         ];
         return next.slice(0, 10);
       });
 
-      // time passing (note: your field name is minutes, but tick is seconds-ish)
       updateCurrentCrop((c) => ({
         lastWateredMinutes: (c.lastWateredMinutes ?? 0) + Math.round(tickMs / 1000),
       }));
     }, tickMs);
 
     return () => clearInterval(interval);
-  }, [currentCrop.id, tickMs, paused, temperature, weather]);
+  }, [currentCrop.id, tickMs, paused]);
 
-  //Crop-aware health logic
+  // Health logic
   useEffect(() => {
     let delta = 0;
 
@@ -217,7 +261,7 @@ const useMyLocation = () => {
     idealTemp.max,
   ]);
 
-  // ✅ Auto-water + logging
+  // Auto-water
   useEffect(() => {
     if (!currentCrop.autoWater) return;
 
@@ -236,7 +280,7 @@ const useMyLocation = () => {
     }
   }, [moisture, currentCrop.autoWater, currentCrop.id, idealMoisture.min]);
 
-  // Manual water + logging
+  // Manual water
   const waterNow = () => {
     const before = moisture;
 
@@ -256,7 +300,7 @@ const useMyLocation = () => {
     updateCurrentCrop((c) => ({ autoWater: !c.autoWater }));
   };
 
-  // Alerts derived from crop-aware logic
+  // Alerts
   const alerts = useMemo(() => {
     let a = 0;
     if (temperature > idealTemp.max) a++;
@@ -275,7 +319,7 @@ const useMyLocation = () => {
     idealTemp.max,
   ]);
 
-  // Trends (previous reading)
+  // Trends
   const prevTemp = history[1]?.temperature;
   const prevMoist = history[1]?.moisture;
   const tempTrend = trend(temperature, prevTemp);
@@ -294,19 +338,24 @@ const useMyLocation = () => {
     <div className="dashboard">
       <h1>Farm Dashboard</h1>
 
-      {/*  Weather source block (must be INSIDE the return JSX) */}
       <div style={{ marginTop: 10, fontSize: 13, opacity: 0.85 }}>
-        <strong>Weather source:</strong> {location.label}{" "}
-        {weatherLoading ? "• loading…" : ""}
-        {weatherError ? `• ${weatherError}` : ""}
+        <strong>Weather source:</strong> {location.label}
+        {weatherLoading ? " (loading...)" : ""}
+        {weatherError ? ` (${weatherError})` : ""}
         <button
           className="btn btn-outline"
           style={{ marginLeft: 10, padding: "8px 10px" }}
           onClick={useMyLocation}
           type="button"
         >
-           my location
+          Use my location
         </button>
+      </div>
+
+      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.85 }}>
+        <strong>Soil moisture:</strong>
+        {moistureLoading ? " loading..." : ""}
+        {moistureError ? ` (${moistureError})` : ""}
       </div>
 
       <div className="stats-grid">
@@ -315,7 +364,6 @@ const useMyLocation = () => {
         ))}
       </div>
 
-      {/* Simulation Controls */}
       <div className="controls">
         <div className="controls-left">
           <h3>Simulation Controls</h3>
@@ -332,7 +380,7 @@ const useMyLocation = () => {
             </select>
           </label>
 
-          <button className="btn btn-outline" onClick={() => setPaused((p) => !p)}>
+          <button className="btn btn-outline" onClick={() => setPaused((p) => !p)} type="button">
             {paused ? "Resume" : "Pause"}
           </button>
         </div>
@@ -373,11 +421,11 @@ const useMyLocation = () => {
           </div>
 
           <div className="actions">
-            <button className="btn" onClick={waterNow}>
-              Water Now!
+            <button className="btn" onClick={waterNow} type="button">
+              Water Now
             </button>
 
-            <button className="btn btn-outline" onClick={toggleAutoWater}>
+            <button className="btn btn-outline" onClick={toggleAutoWater} type="button">
               Auto Water: {currentCrop.autoWater ? "ON" : "OFF"}
             </button>
 
@@ -408,15 +456,12 @@ const useMyLocation = () => {
                 Temperature is too low for {currentCrop.name} (min {idealTemp.min}°C).
               </li>
             )}
-            {(weather === "Rain" || weather === "Showers") && (
-              <li>Rain detected — moisture may improve.</li>
-            )}
+            {(weather === "Rain" || weather === "Showers") && <li>Rain detected. Moisture may improve.</li>}
             {alerts === 0 && <li>Conditions look stable. Keep monitoring.</li>}
           </ul>
         </div>
       </div>
 
-      {/*  Recent Readings (store 10, show 5) */}
       {history.length > 0 && (
         <div className="history">
           <h3>Recent Readings</h3>
@@ -435,7 +480,6 @@ const useMyLocation = () => {
         </div>
       )}
 
-      {/* Irrigation Log */}
       <div className="irrigation">
         <h3>Irrigation Log</h3>
 
