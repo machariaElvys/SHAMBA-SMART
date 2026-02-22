@@ -10,6 +10,7 @@ import Crops from "./pages/Crops";
 import Learn from "./pages/Learn";
 import About from "./pages/About";
 import CropLibrary from "./pages/cropLibrary";
+import { api } from "./services/api";
 
 const STORAGE_KEY = "shambaSmart.crops.v1";
 const STORAGE_CURRENT_KEY = "shambaSmart.currentCropId.v1";
@@ -60,6 +61,25 @@ function App() {
     if (crops.length === 0) return null;
     return crops.find((c) => c.id === currentCropId) || crops[0];
   }, [crops, currentCropId]);
+
+  useEffect(() => {
+  api.getCrops()
+    .then((data) => {
+      setCrops(data || []);
+      if (data?.length) setCurrentCropId(data[0].id);
+      else setCurrentCropId(null);
+    })
+    .catch((e) => console.error(e));
+}, []);
+
+useEffect(() => {
+  api.getCrops()
+    .then((data) => {
+      setCrops(data || []);
+      setCurrentCropId((data && data[0] && data[0].id) || null);
+    })
+    .catch( console.error);
+}, []);
 
   return (
     <ToastProvider>
