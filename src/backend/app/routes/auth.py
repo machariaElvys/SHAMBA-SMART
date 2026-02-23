@@ -1,55 +1,84 @@
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import create_access_token
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 
 from ..extensions import db
-from ..user import User
+from ..models import User
 
 bp = Blueprint("auth", __name__)
 
 
-@bp.post("/api/auth/register")
-def register():
+def _read_credentials():
     data = request.get_json(silent=True) or {}
-
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
+    return email, password
+
+
+@bp.post("/api/auth/register")
+def register():
+    email, password = _read_credentials()
 
     if not email or not password:
         return jsonify({"error": "email and password are required"}), 400
+
+    if "@" not in email:
+        return jsonify({"error": "enter a valid email"}), 400
 
     if len(password) < 6:
         return jsonify({"error": "password must be at least 6 characters"}), 400
 
     existing = User.query.filter_by(email=email).first()
     if existing:
-        return jsonify({"error": "email already registered"}), 409
+        return jsonify({"error": "email already exists"}), 409
 
     user = User(email=email)
-    user.password_hash = generate_password_hash(password)
+    user.set_password(password)
 
     db.session.add(user)
     db.session.commit()
 
-    return jsonify({"message": "account created"}), 201
+    access_token = create_access_token(
+        identity=str(user.id),
+        additional_claims={"email": user.email},
+    )
+
+    return jsonify({
+        "message": "account created",
+        "access_token": access_token,
+        "user": user.to_dict()
+    }), 201
 
 
 @bp.post("/api/auth/login")
 def login():
-    data = request.get_json(silent=True) or {}
-
-    email = (data.get("email") or "").strip().lower()
-    password = data.get("password") or ""
+    email, password = _read_credentials()
 
     if not email or not password:
         return jsonify({"error": "email and password are required"}), 400
 
     user = User.query.filter_by(email=email).first()
-    if not user or not check_password_hash(user.password_hash, password):
+
+    if not user or not user.check_password(password):
         return jsonify({"error": "wrong email or password"}), 401
 
-    access_token = create_access_token(identity=str(user.id))
+    access_token = create_access_token(
+        identity=str(user.id),
+        additional_claims={"email": user.email},
+    )
+
     return jsonify({
         "access_token": access_token,
-        "user": {"id": user.id, "email": user.email}
+        "user": user.to_dict()
     }), 200
+
+
+@bp.get("/api/auth/me")
+@jwt_required()
+def me():
+    user_id = get_jwt_identity()
+    user = db.session.get(User, int(user_id)) if user_id is not None else None
+
+    if not user:
+        return jsonify({"error": "user not found"}), 404
+
+    return jsonify({"user": user.to_dict()}), 200

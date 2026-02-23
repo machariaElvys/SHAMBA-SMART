@@ -1,4 +1,5 @@
-const TOKEN_KEY = "shambaSmart.token";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000").replace(/\/+$/, "");
+const TOKEN_KEY = "shambaSmart.token.v1";
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -12,75 +13,63 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-async function request(path, options = {}) {
-  const token = getToken();
+async function request(path, { method = "GET", body, auth = false } = {}) {
+  const headers = {};
 
-  const headers = {
-    "Content-Type": "application/json",
-    ...(options.headers || {}),
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(path, {
-    ...options,
+  if (auth) {
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
     headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  if (!res.ok) {
-    let msg = "Request failed";
+  const text = await res.text();
+  let data = null;
 
-    try {
-      const data = await res.json();
-      msg = data?.error || data?.msg || msg;
-    } catch {
-      // ignore JSON parse error
-    }
-
-    // Optional: auto logout on expired/invalid token
-    if (res.status === 401) {
-      clearToken();
-    }
-
-    throw new Error(msg);
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
   }
 
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
+  if (!res.ok) {
+    const message =
+      (data && (data.error || data.message || data.msg)) ||
+      `Request failed (${res.status})`;
+    throw new Error(message);
+  }
+
+  return data;
 }
 
 export const api = {
-  // Auth
-  login: (email, password) =>
-    request("/api/auth/login", {
+  register(payload) {
+    return request("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
-    }),
+      body: payload,
+    });
+  },
 
-  // Crops
-  getCrops: () => request("/api/crops"),
-  createCrop: (payload) =>
-    request("/api/crops", {
+  login(payload) {
+    return request("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify(payload),
-    }),
-  updateCrop: (id, patch) =>
-    request(`/api/crops/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(patch),
-    }),
-  deleteCrop: (id) =>
-    request(`/api/crops/${id}`, {
-      method: "DELETE",
-    }),
+      body: payload,
+    });
+  },
 
-  // Irrigation (optional now, useful next)
-  getIrrigationLogs: () => request("/api/irrigation-logs"),
-  createIrrigationLog: (payload) =>
-    request("/api/irrigation-logs", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+  getMe() {
+    return request("/api/auth/me", { auth: true });
+  },
+
+  getCrops() {
+    return request("/api/crops", { auth: true });
+  },
 };

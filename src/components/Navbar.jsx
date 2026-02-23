@@ -2,19 +2,19 @@ import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import "../styles/navbar.css";
 
-function Navbar({ isLoggedIn, onLogout }) {
+function Navbar({ token, onLogout }) {
   const [open, setOpen] = useState(false);
 
   const closeMenu = () => setOpen(false);
 
-  const handleLogoutClick = () => {
+  const handleLogout = () => {
     closeMenu();
-    if (onLogout) onLogout();
+    onLogout?.();
   };
 
   return (
     <nav className="navbar">
-      <Link to={isLoggedIn ? "/" : "/login"} className="nav-brand" onClick={closeMenu}>
+      <Link to="/" className="nav-brand" onClick={closeMenu}>
         <h2>Shamba-Smart</h2>
       </Link>
 
@@ -32,50 +32,55 @@ function Navbar({ isLoggedIn, onLogout }) {
 
       <div className={`nav-links ${open ? "open" : ""}`}>
         <ul>
-          {isLoggedIn ? (
+          <li>
+            <NavLink to="/" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+              Home
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/dashboard" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+              Dashboard
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/crops" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+              Crops
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/learn" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+              Learn
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/library" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+              Crop Library
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/about" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+              About
+            </NavLink>
+          </li>
+
+          {!token ? (
             <>
               <li>
-                <NavLink to="/" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-                  Home
+                <NavLink to="/login" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+                  Login
                 </NavLink>
               </li>
               <li>
-                <NavLink to="/dashboard" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-                  Dashboard
+                <NavLink to="/register" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+                  Register
                 </NavLink>
-              </li>
-              <li>
-                <NavLink to="/crops" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-                  Crops
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/learn" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-                  Learn
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/library" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-                  Crop Library
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/about" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-                  About
-                </NavLink>
-              </li>
-
-              <li>
-                <button type="button" className="nav-logout" onClick={handleLogoutClick}>
-                  Logout
-                </button>
               </li>
             </>
           ) : (
             <li>
-              <NavLink to="/login" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-                Login
-              </NavLink>
+              <button type="button" className="nav-logout-btn" onClick={handleLogout}>
+                Logout
+              </button>
             </li>
           )}
         </ul>

@@ -1,78 +1,82 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { api, setToken } from "../services/api";
+import { Link, useNavigate } from "react-router-dom";
 import "../styles/login.css";
+import { api } from "../services/api";
 
 function Login({ onLoginSuccess }) {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!email.trim() || !password.trim()) {
-      setError("Email and password are required.");
+    if (!email || !password) {
+      setError("Email and password are required");
       return;
     }
 
     try {
       setLoading(true);
+      const data = await api.login(email, password);
 
-      const res = await api.login(email.trim(), password);
-      setToken(res.access_token);
-
-      if (onLoginSuccess) onLoginSuccess(res.access_token);
+      if (data?.access_token && onLoginSuccess) {
+        onLoginSuccess(data.access_token);
+      }
 
       navigate("/dashboard");
     } catch (err) {
-      setError(err.message || "Login failed.");
+      setError(err.message || "Login failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="login-page">
-      <div className="login-card">
+    <div className="auth-page">
+      <div className="auth-card">
         <h1>Sign in</h1>
-        <p className="login-subtitle">Access your Shamba Smart dashboard.</p>
+        <p className="auth-subtitle">Access your Shamba Smart dashboard.</p>
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="field">
-            <label>Email</label>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <div className="auth-field">
+            <label htmlFor="login-email">Email</label>
             <input
+              id="login-email"
               type="email"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@example.com"
               autoComplete="email"
             />
           </div>
 
-          <div className="field">
-            <label>Password</label>
+          <div className="auth-field">
+            <label htmlFor="login-password">Password</label>
             <input
+              id="login-password"
               type="password"
+              placeholder="Enter password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="password"
               autoComplete="current-password"
             />
           </div>
 
-          {error ? <p className="login-error">{error}</p> : null}
+          {error ? <div className="auth-error">{error}</div> : null}
 
-          <button className="login-btn" type="submit" disabled={loading}>
+          <button type="submit" className="auth-btn" disabled={loading}>
             {loading ? "Signing in..." : "Login"}
           </button>
         </form>
 
-       
+        <p className="auth-link-text">
+          No account? <Link to="/register">Create one</Link>
+        </p>
       </div>
     </div>
   );
