@@ -1,8 +1,9 @@
 import { useState } from "react";
 import "../styles/crops.css";
 import { useToast } from "../components/ToastProvider";
+import { api } from "../services/api";
 
-// Preset profiles (expand anytime)
+// Preset profiles
 const CROP_PROFILES = {
   maize: {
     label: "Recommended (Maize)",
@@ -37,19 +38,6 @@ function getProfileForName(name) {
   return CROP_PROFILES[key] ?? DEFAULT_PROFILE;
 }
 
-function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
-  const { notify } = useToast();
-
-  const [name, setName] = useState("");
-  const [stage, setStage] = useState("Seedling");
-  const [editingId, setEditingId] = useState(null);
-  const [lastRemoved, setLastRemoved] = useState(null);
-
-  // Custom confirm modal state
-  const [deleteTarget, setDeleteTarget] = useState(null);
-
-
-
 function insertAt(arr, index, item) {
   const next = arr.slice();
   const safe = Math.max(0, Math.min(index, next.length));
@@ -57,7 +45,17 @@ function insertAt(arr, index, item) {
   return next;
 }
 
-  const addCrop = (e) => {
+function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
+  const { notify } = useToast();
+
+  const [name, setName] = useState("");
+  const [stage, setStage] = useState("Seedling");
+  const [editingId, setEditingId] = useState(null);
+
+  // confirm modal
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const addCrop = async (e) => {
     e.preventDefault();
 
     const trimmed = name.trim();
@@ -68,27 +66,31 @@ function insertAt(arr, index, item) {
 
     const profile = getProfileForName(trimmed);
 
-    const newCrop = {
-      id: crypto.randomUUID(),
+    const payload = {
       name: trimmed,
       stage,
       health: 75,
       lastWateredMinutes: 0,
       autoWater: false,
-
       profileLabel: profile.label,
       idealMoisture: profile.idealMoisture,
       idealTemp: profile.idealTemp,
     };
 
-    setCrops((prev) => [newCrop, ...prev]);
-    setCurrentCropId(newCrop.id);
+    try {
+      const saved = await api.createCrop(payload);
 
-    notify(`Added crop: ${trimmed}.`, "success");
+      setCrops((prev) => [saved, ...prev]);
+      setCurrentCropId(saved.id);
 
-    setName("");
-    setStage("Seedling");
-    setEditingId(null);
+      notify(`Added crop: ${saved.name}.`, "success");
+
+      setName("");
+      setStage("Seedling");
+      setEditingId(null);
+    } catch (err) {
+      notify(err.message || "Failed to add crop.", "error");
+    }
   };
 
   const updateCrop = (cropId, updater) => {
@@ -100,60 +102,83 @@ function insertAt(arr, index, item) {
     notify(`Current crop set to: ${crop.name}.`, "info");
   };
 
-  const toggleEdit = (crop) => {
+  const toggleEdit = async (crop) => {
     const isEditing = editingId === crop.id;
 
     if (isEditing) {
       setEditingId(null);
-      notify(`Saved profile changes for: ${crop.name}.`, "success");
+
+      try {
+        await api.updateCrop(crop.id, {
+          profileLabel: crop.profileLabel,
+          idealMoisture: crop.idealMoisture,
+          idealTemp: crop.idealTemp,
+        });
+
+        notify(`Saved profile changes for: ${crop.name}.`, "success");
+      } catch (err) {
+        notify(err.message || "Failed to save changes.", "error");
+      }
     } else {
       setEditingId(crop.id);
       notify(`Editing profile for: ${crop.name}.`, "info");
     }
   };
 
-  // Open custom confirm modal
   const askRemove = (crop) => {
     setDeleteTarget(crop);
   };
 
-  // Confirm remove
-  const confirmRemove = () => {
-  if (!deleteTarget) return;
+  const confirmRemove = async () => {
+    if (!deleteTarget) return;
 
-  const cropId = deleteTarget.id;
-  const removedIndex = crops.findIndex((c) => c.id === cropId);
-  const wasCurrent = cropId === currentCropId;
+    const cropId = deleteTarget.id;
+    const removedIndex = crops.findIndex((c) => c.id === cropId);
+    const wasCurrent = cropId === currentCropId;
 
-  setLastRemoved({
-    crop: deleteTarget,
-    index: removedIndex,
-    wasCurrent,
-  });
+    try {
+      await api.deleteCrop(cropId);
 
-  setCrops((prev) => prev.filter((c) => c.id !== cropId));
+      setCrops((prev) => {
+        const next = prev.filter((c) => c.id !== cropId);
+        if (wasCurrent) setCurrentCropId(next[0]?.id ?? null);
+        return next;
+      });
 
-  if (wasCurrent) {
-    const remaining = crops.filter((c) => c.id !== cropId);
-    setCurrentCropId(remaining[0]?.id ?? null);
-  }
+      if (editingId === cropId) setEditingId(null);
 
-  if (editingId === cropId) setEditingId(null);
+      notify(`Removed crop: ${deleteTarget.name}.`, "info", {
+        duration: 5000,
+        actionLabel: "Undo",
+        onAction: async () => {
+          try {
+            const recreated = await api.createCrop({
+              name: deleteTarget.name,
+              stage: deleteTarget.stage,
+              health: deleteTarget.health ?? 75,
+              lastWateredMinutes: 0,
+              autoWater: deleteTarget.autoWater ?? false,
+              profileLabel: deleteTarget.profileLabel,
+              idealMoisture: deleteTarget.idealMoisture,
+              idealTemp: deleteTarget.idealTemp,
+            });
 
-  notify(`Removed crop: ${deleteTarget.name}.`, "info", {
-    duration: 5000,
-    actionLabel: "Undo",
-    onAction: () => {
-      setCrops((prev) => insertAt(prev, removedIndex, deleteTarget));
-      if (wasCurrent) setCurrentCropId(deleteTarget.id);
-      notify(`Restored crop: ${deleteTarget.name}.`, "success");
-    },
-  });
+            setCrops((prev) => insertAt(prev, removedIndex, recreated));
+            if (wasCurrent) setCurrentCropId(recreated.id);
 
-  setDeleteTarget(null);
-};
+            notify(`Restored crop: ${recreated.name}.`, "success");
+          } catch (err) {
+            notify(err.message || "Failed to undo removal.", "error");
+          }
+        },
+      });
+    } catch (err) {
+      notify(err.message || "Failed to remove crop.", "error");
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
 
-  // Cancel remove
   const cancelRemove = () => {
     setDeleteTarget(null);
     notify("Removal cancelled.", "info");
@@ -309,7 +334,6 @@ function insertAt(arr, index, item) {
         })}
       </div>
 
-      {/* Custom confirm modal */}
       {deleteTarget && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal">

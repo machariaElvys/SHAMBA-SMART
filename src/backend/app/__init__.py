@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_cors import CORS
 from .config import Config
-from .extensions import db, migrate
+from .extensions import db, migrate, jwt
 
 def create_app():
     app = Flask(__name__)
@@ -12,6 +12,7 @@ def create_app():
 
     db.init_app(app)
     migrate.init_app(app, db)
+    jwt.init_app(app)
 
     origins = app.config.get("CORS_ORIGINS", [])
     CORS(app, resources={r"/api/*": {"origins": origins or "*"}})
@@ -19,9 +20,11 @@ def create_app():
     from .routes.health import bp as health_bp
     from .routes.crops import bp as crops_bp
     from .routes.irrigation import bp as irrigation_bp
+    from .routes.auth import bp as auth_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(crops_bp)
     app.register_blueprint(irrigation_bp)
+    app.register_blueprint(auth_bp)
 
     return app

@@ -17,7 +17,7 @@ const STORAGE_CURRENT_KEY = "shambaSmart.currentCropId.v1";
 
 function App() {
   
-  // ✅ load crops from localStorage (or start empty)
+  //  load crops from localStorage (or start empty)
   const [crops, setCrops] = useState(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -27,7 +27,7 @@ function App() {
     }
   });
 
-  // ✅ load current crop id (or null)
+  //  load current crop id (or null)
   const [currentCropId, setCurrentCropId] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_CURRENT_KEY) || null;
@@ -36,18 +36,18 @@ function App() {
     }
   });
 
-  // ✅ save crops whenever they change
+  // save crops whenever they change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(crops));
   }, [crops]);
 
-  // ✅ save currentCropId whenever it changes
+  // save currentCropId whenever it changes
   useEffect(() => {
     if (currentCropId) localStorage.setItem(STORAGE_CURRENT_KEY, currentCropId);
     else localStorage.removeItem(STORAGE_CURRENT_KEY);
   }, [currentCropId]);
 
-  // ✅ keep currentCropId valid
+  //  keep currentCropId valid
   useEffect(() => {
     if (crops.length === 0) {
       setCurrentCropId(null);
@@ -62,23 +62,20 @@ function App() {
     return crops.find((c) => c.id === currentCropId) || crops[0];
   }, [crops, currentCropId]);
 
-  useEffect(() => {
-  api.getCrops()
-    .then((data) => {
-      setCrops(data || []);
-      if (data?.length) setCurrentCropId(data[0].id);
-      else setCurrentCropId(null);
-    })
-    .catch((e) => console.error(e));
-}, []);
+
 
 useEffect(() => {
   api.getCrops()
     .then((data) => {
-      setCrops(data || []);
-      setCurrentCropId((data && data[0] && data[0].id) || null);
+      const list = data || [];
+      setCrops(list);
+
+      setCurrentCropId((prev) => {
+        if (prev && list.some((c) => c.id === prev)) return prev;
+        return list[0]?.id ?? null;
+      });
     })
-    .catch( console.error);
+    .catch(console.error);
 }, []);
 
   return (

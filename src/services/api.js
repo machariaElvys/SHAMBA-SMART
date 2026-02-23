@@ -1,7 +1,5 @@
-const BASE = import.meta.env.VITE_API_BASE_URL || "";
-
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
   });
@@ -15,14 +13,20 @@ async function request(path, options = {}) {
     throw new Error(msg);
   }
 
-  // handle empty responses
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
 
 export const api = {
   getCrops: () => request("/api/crops"),
-  createCrop: (payload) => request("/api/crops", { method: "POST", body: JSON.stringify(payload) }),
-  updateCrop: (id, patch) => request(`/api/crops/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  createCrop: (payload) =>
+    request("/api/crops", { method: "POST", body: JSON.stringify(payload) }),
+  updateCrop: (id, patch) =>
+    request(`/api/crops/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteCrop: (id) => request(`/api/crops/${id}`, { method: "DELETE" }),
+
+  createIrrigationLog: (payload) =>
+    request("/api/irrigation-logs", { method: "POST", body: JSON.stringify(payload) }),
+  getIrrigationLogs: (cropId) =>
+    request(`/api/irrigation-logs${cropId ? `?crop_id=${encodeURIComponent(cropId)}` : ""}`),
 };

@@ -10,3 +10,4 @@ class Config:
 
     # Comma-separated
     CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+    JWT_SECRET_KEY= os.getenv("JWT_SECRET_KEY", "change-me")
