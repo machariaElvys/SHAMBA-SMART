@@ -124,3 +124,18 @@
     display: block;
   }
 }
+
+.nav-logout {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 13px;
+  color: #2f3f37;
+}
+
+.nav-logout:hover {
+  background: rgba(0, 0, 0, 0.06);
+}

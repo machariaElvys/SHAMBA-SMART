@@ -63,3 +63,5 @@ class IrrigationLog(db.Model):
             "after": self.after,
             "createdAt": self.created_at.isoformat(),
         }
+    
+

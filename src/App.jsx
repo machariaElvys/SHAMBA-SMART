@@ -1,33 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { ToastProvider } from "./components/ToastProvider";
+
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Crops from "./pages/Crops";
 import Learn from "./pages/Learn";
 import About from "./pages/About";
 import CropLibrary from "./pages/cropLibrary";
-import { api } from "./services/api";
+import Login from "./pages/Login";
 
-const STORAGE_KEY = "shambaSmart.crops.v1";
+import { api, getToken, clearToken } from "./services/api";
+
 const STORAGE_CURRENT_KEY = "shambaSmart.currentCropId.v1";
 
 function App() {
-  
-  //  load crops from localStorage (or start empty)
-  const [crops, setCrops] = useState(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [token, setTokenState] = useState(() => getToken());
 
-  //  load current crop id (or null)
+  const [crops, setCrops] = useState([]);
+
   const [currentCropId, setCurrentCropId] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_CURRENT_KEY) || null;
@@ -36,21 +30,57 @@ function App() {
     }
   });
 
-  // save crops whenever they change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(crops));
-  }, [crops]);
+  const handleLoginSuccess = (newToken) => {
+    setTokenState(newToken);
+  };
 
-  // save currentCropId whenever it changes
+  const handleLogout = () => {
+    clearToken();
+    setTokenState(null);
+    setCrops([]);
+    setCurrentCropId(null);
+  };
+
+  // Persist currentCropId (nice UX)
   useEffect(() => {
-    if (currentCropId) localStorage.setItem(STORAGE_CURRENT_KEY, currentCropId);
-    else localStorage.removeItem(STORAGE_CURRENT_KEY);
+    try {
+      if (currentCropId) localStorage.setItem(STORAGE_CURRENT_KEY, currentCropId);
+      else localStorage.removeItem(STORAGE_CURRENT_KEY);
+    } catch {
+      // ignore
+    }
   }, [currentCropId]);
 
-  //  keep currentCropId valid
+  // Load crops from API only when logged in
   useEffect(() => {
-    if (crops.length === 0) {
+    if (!token) {
+      setCrops([]);
       setCurrentCropId(null);
+      return;
+    }
+
+    api.getCrops()
+      .then((data) => {
+        const list = data || [];
+        setCrops(list);
+
+        setCurrentCropId((prev) => {
+          if (prev && list.some((c) => c.id === prev)) return prev;
+          return list[0]?.id ?? null;
+        });
+      })
+      .catch((err) => {
+        console.error(err);
+        // If token is invalid/expired, api.js clears token on 401
+        if (!getToken()) handleLogout();
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // Keep currentCropId valid if crops list changes (delete, etc.)
+  useEffect(() => {
+    if (!crops.length) {
+      if (currentCropId !== null) setCurrentCropId(null);
       return;
     }
     const stillExists = crops.some((c) => c.id === currentCropId);
@@ -58,75 +88,74 @@ function App() {
   }, [crops, currentCropId]);
 
   const currentCrop = useMemo(() => {
-    if (crops.length === 0) return null;
+    if (!crops.length) return null;
     return crops.find((c) => c.id === currentCropId) || crops[0];
   }, [crops, currentCropId]);
 
-
-
-useEffect(() => {
-  api.getCrops()
-    .then((data) => {
-      const list = data || [];
-      setCrops(list);
-
-      setCurrentCropId((prev) => {
-        if (prev && list.some((c) => c.id === prev)) return prev;
-        return list[0]?.id ?? null;
-      });
-    })
-    .catch(console.error);
-}, []);
+  const requireAuth = (element) => (token ? element : <Navigate to="/login" replace />);
 
   return (
     <ToastProvider>
-    <div>
-      
-      <Navbar />
+      <div>
+        <Navbar isLoggedIn={!!token} onLogout={handleLogout}/>
 
-      <main>
-        <div className="container">
-       <Routes>
-          <Route path="/" element={<Home />} />
-
-           <Route
-            path="/dashboard"
-            element={<Dashboard currentCrop={currentCrop} setCrops={setCrops} />}
-          />
-
-          <Route
-            path="/crops"
-            element={
-              <Crops
-                crops={crops}
-                setCrops={setCrops}
-                currentCropId={currentCropId}
-                setCurrentCropId={setCurrentCropId}
+        <main>
+          <div className="container">
+            <Routes>
+              <Route
+                path="/login"
+                element={
+                  token ? (
+                    <Navigate to="/dashboard" replace />
+                  ) : (
+                    <Login onLoginSuccess={handleLoginSuccess} />
+                  )
+                }
               />
-            }
-          />
 
-          <Route path="/learn" element={<Learn />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/library"
-           element={<CropLibrary
-              crops={crops}
-              setCrops={setCrops}
-              currentCropId={currentCropId}
-              setCurrentCropId={setCurrentCropId}
-            
+              <Route path="/" element={requireAuth(<Home />)} />
 
-            />} />
-        </Routes>
-        </div>
-       
-      </main>
+              <Route
+                path="/dashboard"
+                element={requireAuth(<Dashboard currentCrop={currentCrop} setCrops={setCrops} />)}
+              />
 
-      <Footer />
-    </div>
+              <Route
+                path="/crops"
+                element={requireAuth(
+                  <Crops
+                    crops={crops}
+                    setCrops={setCrops}
+                    currentCropId={currentCropId}
+                    setCurrentCropId={setCurrentCropId}
+                  />
+                )}
+              />
+
+              <Route path="/learn" element={requireAuth(<Learn />)} />
+              <Route path="/about" element={requireAuth(<About />)} />
+
+              <Route
+                path="/library"
+                element={requireAuth(
+                  <CropLibrary
+                    crops={crops}
+                    setCrops={setCrops}
+                    currentCropId={currentCropId}
+                    setCurrentCropId={setCurrentCropId}
+                  />
+                )}
+              />
+
+              <Route path="*" element={<Navigate to={token ? "/" : "/login"} replace />} />
+            </Routes>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
     </ToastProvider>
   );
 }
 
 export default App;
-

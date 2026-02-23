@@ -1,15 +1,19 @@
 from flask import Blueprint, jsonify, request
 from ..extensions import db
 from ..models import Crop
+from flask_jwt_extended import jwt_required
 
 bp = Blueprint("irrigation", __name__)
 
 @bp.get("/api/crops")
+@jwt_required()
 def list_crops():
     crops = Crop.query.order_by(Crop.created_at.desc()).all()
     return jsonify([c.to_dict() for c in crops])
 
 @bp.post("/api/crops")
+@jwt_required()
+
 def create_crop():
     data = request.get_json(force=True) or {}
 
@@ -35,6 +39,8 @@ def create_crop():
     return jsonify(crop.to_dict()), 201
 
 @bp.get("/api/crops/<crop_id>")
+@jwt_required()
+
 def get_crop(crop_id):
     crop = Crop.query.get(crop_id)
     if not crop:
@@ -42,6 +48,8 @@ def get_crop(crop_id):
     return jsonify(crop.to_dict())
 
 @bp.patch("/api/crops/<crop_id>")
+@jwt_required()
+
 def update_crop(crop_id):
     crop = Crop.query.get(crop_id)
     if not crop:
@@ -84,6 +92,8 @@ def update_crop(crop_id):
     return jsonify(crop.to_dict())
 
 @bp.delete("/api/crops/<crop_id>")
+@jwt_required()
+
 def delete_crop(crop_id):
     crop = Crop.query.get(crop_id)
     if not crop:
