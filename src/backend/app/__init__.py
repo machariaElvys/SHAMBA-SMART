@@ -13,27 +13,16 @@ def create_app():
         raise RuntimeError("DATABASE_URL is missing. Set it in your .env file.")
 
     db.init_app(app)
-
-    from .models import Crop, IrrigationLog, User  # noqa: F401
-
     migrate.init_app(app, db)
     jwt.init_app(app)
 
-    # Parse CORS origins correctly (comma-separated string -> list)
-    raw_origins = app.config.get("CORS_ORIGINS", "")
-    if isinstance(raw_origins, str):
-        origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
-    elif isinstance(raw_origins, (list, tuple)):
-        origins = list(raw_origins)
-    else:
-        origins = []
+    # Import models so Flask-Migrate can detect them
+    from .models import Crop, IrrigationLog, User  # noqa: F401
 
-    if not origins:
-        origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
-
+    # ✅ TEMPORARY HARD-CODED CORS (dev fix)
     CORS(
         app,
-        resources={r"/api/*": {"origins": origins}},
+        resources={r"/api/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}},
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     )

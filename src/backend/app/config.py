@@ -16,5 +16,5 @@ class Config:
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-in-production")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=1)
 
-    _cors_raw = os.getenv("CORS_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173")
+    _cors_raw = os.getenv("CORS_ORIGINS", "")
     CORS_ORIGINS = [x.strip() for x in _cors_raw.split(",") if x.strip()]
