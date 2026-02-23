@@ -100,7 +100,7 @@ function App() {
   return (
     <ToastProvider>
       <div>
-        <Navbar token={token} onLogout={handleLogout} />
+        <Navbar isLoggedIn={!!token} onLogout={handleLogout} />
 
         <main>
           <div className="container">

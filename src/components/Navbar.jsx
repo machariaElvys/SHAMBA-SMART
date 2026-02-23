@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import "../styles/navbar.css";
 
-function Navbar({ token, onLogout }) {
+function Navbar({ isLoggedIn = false, onLogout }) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
   const closeMenu = () => setOpen(false);
 
-  const handleLogout = () => {
+  const handleLogoutClick = () => {
     closeMenu();
-    onLogout?.();
+    if (onLogout) onLogout();
+    navigate("/login");
   };
 
   return (
@@ -37,33 +39,38 @@ function Navbar({ token, onLogout }) {
               Home
             </NavLink>
           </li>
+
           <li>
             <NavLink to="/dashboard" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
               Dashboard
             </NavLink>
           </li>
+
           <li>
             <NavLink to="/crops" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
               Crops
             </NavLink>
           </li>
+
           <li>
             <NavLink to="/learn" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
               Learn
             </NavLink>
           </li>
+
           <li>
             <NavLink to="/library" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
               Crop Library
             </NavLink>
           </li>
+
           <li>
             <NavLink to="/about" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
               About
             </NavLink>
           </li>
 
-          {!token ? (
+          {!isLoggedIn ? (
             <>
               <li>
                 <NavLink to="/login" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
@@ -78,7 +85,7 @@ function Navbar({ token, onLogout }) {
             </>
           ) : (
             <li>
-              <button type="button" className="nav-logout-btn" onClick={handleLogout}>
+              <button type="button" className="logout-btn" onClick={handleLogoutClick}>
                 Logout
               </button>
             </li>
@@ -86,7 +93,14 @@ function Navbar({ token, onLogout }) {
         </ul>
       </div>
 
-      {open && <button type="button" className="nav-overlay" onClick={closeMenu} aria-label="Close menu" />}
+      {open && (
+        <button
+          type="button"
+          className="nav-overlay"
+          onClick={closeMenu}
+          aria-label="Close menu"
+        />
+      )}
     </nav>
   );
 }

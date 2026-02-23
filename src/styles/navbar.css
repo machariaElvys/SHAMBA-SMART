@@ -125,17 +125,21 @@
   }
 }
 
-.nav-logout {
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: rgba(0, 0, 0, 0.03);
+.logout-btn {
+  border: none;
+  background: #1f6f43;
+  color: #fff;
+  padding: 0.55rem 0.95rem;
+  border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 8px 10px;
-  border-radius: 10px;
-  font-weight: 800;
-  font-size: 13px;
-  color: #2f3f37;
+  transition: opacity 0.2s ease, transform 0.1s ease;
 }
 
-.nav-logout:hover {
-  background: rgba(0, 0, 0, 0.06);
+.logout-btn:hover {
+  opacity: 0.92;
+}
+
+.logout-btn:active {
+  transform: scale(0.98);
 }
