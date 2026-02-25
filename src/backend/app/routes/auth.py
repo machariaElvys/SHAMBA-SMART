@@ -3,12 +3,25 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 
 from ..extensions import db
 from ..models import User
+import json
 
 bp = Blueprint("auth", __name__)
 
 
 def _read_credentials():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+
+    # if frontend accidentally sends JSON string instead of object
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except Exception:
+            data = {}
+
+    # if body is still not a dict, avoid crashing
+    if not isinstance(data, dict):
+        data = {}
+
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
     return email, password
@@ -73,7 +86,6 @@ def login():
 
 
 @bp.get("/api/auth/me")
-@jwt_required()
 def me():
     user_id = get_jwt_identity()
     user = db.session.get(User, int(user_id)) if user_id is not None else None

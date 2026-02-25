@@ -19,7 +19,6 @@ def create_app():
     # Import models so Flask-Migrate can detect them
     from .models import Crop, IrrigationLog, User  # noqa: F401
 
-    # ✅ TEMPORARY HARD-CODED CORS (dev fix)
     CORS(
         app,
         resources={r"/api/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}},

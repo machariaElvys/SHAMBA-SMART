@@ -1,18 +1,11 @@
 import { useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import "../styles/navbar.css";
 
-function Navbar({ isLoggedIn = false, onLogout }) {
+function Navbar() {
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
 
   const closeMenu = () => setOpen(false);
-
-  const handleLogoutClick = () => {
-    closeMenu();
-    if (onLogout) onLogout();
-    navigate("/login");
-  };
 
   return (
     <nav className="navbar">
@@ -70,26 +63,17 @@ function Navbar({ isLoggedIn = false, onLogout }) {
             </NavLink>
           </li>
 
-          {!isLoggedIn ? (
-            <>
-              <li>
-                <NavLink to="/login" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-                  Login
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/register" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-                  Register
-                </NavLink>
-              </li>
-            </>
-          ) : (
-            <li>
-              <button type="button" className="logout-btn" onClick={handleLogoutClick}>
-                Logout
-              </button>
-            </li>
-          )}
+          <li>
+            <NavLink to="/login" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+              Login
+            </NavLink>
+          </li>
+
+          <li>
+            <NavLink to="/register" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+              Register
+            </NavLink>
+          </li>
         </ul>
       </div>
 

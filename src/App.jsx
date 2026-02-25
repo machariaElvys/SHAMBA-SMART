@@ -11,22 +11,11 @@ import Crops from "./pages/Crops";
 import Learn from "./pages/Learn";
 import About from "./pages/About";
 import CropLibrary from "./pages/cropLibrary";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-
-import { api, getToken, clearToken } from "./services/api";
 
 const STORAGE_KEY = "shambaSmart.crops.v1";
 const STORAGE_CURRENT_KEY = "shambaSmart.currentCropId.v1";
 
-function RequireAuth({ token, children }) {
-  if (!token) return <Navigate to="/login" replace />;
-  return children;
-}
-
 function App() {
-  const [token, setTokenState] = useState(() => getToken());
-
   const [crops, setCrops] = useState(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -43,17 +32,6 @@ function App() {
       return null;
     }
   });
-
-  const handleLoginSuccess = (newToken) => {
-    setTokenState(newToken);
-  };
-
-  const handleLogout = () => {
-    clearToken();
-    setTokenState(null);
-    setCrops([]);
-    setCurrentCropId(null);
-  };
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(crops));
@@ -78,77 +56,31 @@ function App() {
     return crops.find((c) => c.id === currentCropId) || crops[0];
   }, [crops, currentCropId]);
 
-  useEffect(() => {
-    if (!token) return;
-
-    api
-      .getCrops()
-      .then((data) => {
-        const list = Array.isArray(data) ? data : [];
-        setCrops(list);
-
-        setCurrentCropId((prev) => {
-          if (prev && list.some((c) => c.id === prev)) return prev;
-          return list[0]?.id ?? null;
-        });
-      })
-      .catch((err) => {
-        console.error("Failed to load crops:", err);
-      });
-  }, [token]);
-
   return (
     <ToastProvider>
       <div>
-        <Navbar isLoggedIn={!!token} onLogout={handleLogout} />
+        <Navbar />
 
         <main>
           <div className="container">
             <Routes>
               <Route path="/" element={<Home />} />
 
-              <Route
-                path="/login"
-                element={
-                  token ? (
-                    <Navigate to="/dashboard" replace />
-                  ) : (
-                    <Login onLoginSuccess={handleLoginSuccess} />
-                  )
-                }
-              />
-
-              <Route
-                path="/register"
-                element={
-                  token ? (
-                    <Navigate to="/dashboard" replace />
-                  ) : (
-                    <Register onLoginSuccess={handleLoginSuccess} />
-                  )
-                }
-              />
-
+              {/* ✅ frontend-only routes */}
               <Route
                 path="/dashboard"
-                element={
-                  <RequireAuth token={token}>
-                    <Dashboard currentCrop={currentCrop} setCrops={setCrops} />
-                  </RequireAuth>
-                }
+                element={<Dashboard currentCrop={currentCrop} setCrops={setCrops} />}
               />
 
               <Route
                 path="/crops"
                 element={
-                  <RequireAuth token={token}>
-                    <Crops
-                      crops={crops}
-                      setCrops={setCrops}
-                      currentCropId={currentCropId}
-                      setCurrentCropId={setCurrentCropId}
-                    />
-                  </RequireAuth>
+                  <Crops
+                    crops={crops}
+                    setCrops={setCrops}
+                    currentCropId={currentCropId}
+                    setCurrentCropId={setCurrentCropId}
+                  />
                 }
               />
 
@@ -158,16 +90,18 @@ function App() {
               <Route
                 path="/library"
                 element={
-                  <RequireAuth token={token}>
-                    <CropLibrary
-                      crops={crops}
-                      setCrops={setCrops}
-                      currentCropId={currentCropId}
-                      setCurrentCropId={setCurrentCropId}
-                    />
-                  </RequireAuth>
+                  <CropLibrary
+                    crops={crops}
+                    setCrops={setCrops}
+                    currentCropId={currentCropId}
+                    setCurrentCropId={setCurrentCropId}
+                  />
                 }
               />
+
+              {/* ✅ kill auth pages completely */}
+              <Route path="/login" element={<Navigate to="/" replace />} />
+              <Route path="/register" element={<Navigate to="/" replace />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -1,19 +1,17 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, setToken } from "../services/api";
-import "../styles/auth.css";
+import "../styles/auth.css"; // or "../styles/login.css" if that's what you're using
 
-function Register({ onLoginSuccess }) {
+function Register() {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setError("");
 
@@ -39,30 +37,20 @@ function Register({ onLoginSuccess }) {
       return;
     }
 
-    try {
-      setLoading(true);
+    setLoading(true);
 
-      const res = await api.register({
-        email: cleanEmail,
-        password,
-      });
+    // FRONTEND ONLY (fake account/session)
+    localStorage.setItem("token", "demo-token");
+    localStorage.setItem(
+      "user",
+      JSON.stringify({ id: "demo", email: cleanEmail })
+    );
 
-      if (res?.access_token) {
-        setToken(res.access_token);
-        if (onLoginSuccess) onLoginSuccess(res.access_token);
-        navigate("/dashboard");
-      } else {
-        setError("Registration succeeded but no token returned");
-      }
-    } catch (err) {
-      setError(err.message || "Failed to fetch");
-    } finally {
-      setLoading(false);
-    }
+    navigate("/dashboard");
   };
 
   return (
-    <section className="auth-page">
+    <div className="auth-page">
       <div className="auth-card">
         <h1>Create account</h1>
         <p className="auth-subtitle">Register with your own email and password.</p>
@@ -73,9 +61,9 @@ function Register({ onLoginSuccess }) {
             <input
               id="email"
               type="email"
-              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@gmail.com"
               autoComplete="email"
             />
           </div>
@@ -85,9 +73,9 @@ function Register({ onLoginSuccess }) {
             <input
               id="password"
               type="password"
-              placeholder="At least 6 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
               autoComplete="new-password"
             />
           </div>
@@ -97,25 +85,25 @@ function Register({ onLoginSuccess }) {
             <input
               id="confirmPassword"
               type="password"
-              placeholder="Repeat password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirm password"
               autoComplete="new-password"
             />
           </div>
 
-          {error && <div className="auth-error">{error}</div>}
+          {error ? <div className="auth-error">{error}</div> : null}
 
           <button className="auth-btn" type="submit" disabled={loading}>
-            {loading ? "Creating..." : "Register"}
+            {loading ? "Registering..." : "Register"}
           </button>
         </form>
 
-        <p className="auth-switch">
+        <p className="auth-link-text">
           Already have an account? <Link to="/login">Sign in</Link>
         </p>
       </div>
-    </section>
+    </div>
   );
 }
 
