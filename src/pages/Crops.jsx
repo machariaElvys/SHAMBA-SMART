@@ -186,6 +186,7 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId }) {
 
   return (
     <div className="crops-page">
+      <p className="page-kicker">Your field journal</p>
       <h1>Crops</h1>
 
       <form className="crop-form" onSubmit={addCrop}>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -11,98 +11,166 @@ import Crops from "./pages/Crops";
 import Learn from "./pages/Learn";
 import About from "./pages/About";
 import CropLibrary from "./pages/cropLibrary";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import { api, clearToken, getToken } from "./services/api";
 
-const STORAGE_KEY = "shambaSmart.crops.v1";
-const STORAGE_CURRENT_KEY = "shambaSmart.currentCropId.v1";
+function ProtectedRoute({ authReady, user, children }) {
+  if (!authReady) return <div className="app-state">Opening your field journal…</div>;
+  return user ? children : <Navigate to="/login" replace />;
+}
+
+function currentCropStorageKey(accountId) {
+  return "shambaSmart.currentCropId." + accountId;
+}
 
 function App() {
-  const [crops, setCrops] = useState(() => {
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [crops, setCrops] = useState([]);
+  const [currentCropId, setCurrentCropId] = useState(null);
+
+  const restoreCropSelection = (account, accountCrops) => {
+    let savedId = null;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
+      savedId = localStorage.getItem(currentCropStorageKey(account.id));
     } catch {
-      return [];
+      savedId = null;
     }
-  });
+    const selectedId = accountCrops.some((crop) => crop.id === savedId)
+      ? savedId
+      : accountCrops[0]?.id ?? null;
+    setCurrentCropId(selectedId);
+  };
 
-  const [currentCropId, setCurrentCropId] = useState(() => {
+  const chooseCurrentCrop = (cropId) => {
+    setCurrentCropId(cropId);
+    if (!user) return;
     try {
-      return localStorage.getItem(STORAGE_CURRENT_KEY) || null;
+      const key = currentCropStorageKey(user.id);
+      if (cropId) localStorage.setItem(key, cropId);
+      else localStorage.removeItem(key);
     } catch {
-      return null;
+      // Selection remains active for this session if storage is unavailable.
     }
-  });
+  };
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(crops));
-  }, [crops]);
-
-  useEffect(() => {
-    if (currentCropId) localStorage.setItem(STORAGE_CURRENT_KEY, currentCropId);
-    else localStorage.removeItem(STORAGE_CURRENT_KEY);
-  }, [currentCropId]);
-
-  useEffect(() => {
-    if (crops.length === 0) {
-      setCurrentCropId(null);
-      return;
+  const loadAccount = async (account) => {
+    setAuthReady(false);
+    setUser(account);
+    setCrops([]);
+    setCurrentCropId(null);
+    try {
+      const accountCrops = await api.getCrops();
+      setCrops(accountCrops);
+      restoreCropSelection(account, accountCrops);
+    } catch {
+      setCrops([]);
+    } finally {
+      setAuthReady(true);
     }
-    const stillExists = crops.some((c) => c.id === currentCropId);
-    if (!stillExists) setCurrentCropId(crops[0].id);
-  }, [crops, currentCropId]);
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    async function restoreSession() {
+      if (!getToken()) {
+        setAuthReady(true);
+        return;
+      }
+
+      try {
+        const result = await api.me();
+        if (!active) return;
+        setUser(result.user);
+        const accountCrops = await api.getCrops();
+        if (!active) return;
+        setCrops(accountCrops);
+        restoreCropSelection(result.user, accountCrops);
+      } catch (error) {
+        if (error.status === 401) clearToken();
+        if (active) {
+          setUser(null);
+          setCrops([]);
+          setCurrentCropId(null);
+        }
+      } finally {
+        if (active) setAuthReady(true);
+      }
+    }
+
+    restoreSession();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const currentCrop = useMemo(() => {
     if (crops.length === 0) return null;
-    return crops.find((c) => c.id === currentCropId) || crops[0];
+    return crops.find((crop) => crop.id === currentCropId) || crops[0];
   }, [crops, currentCropId]);
+
+  const logout = () => {
+    clearToken();
+    setUser(null);
+    setCrops([]);
+    setCurrentCropId(null);
+  };
 
   return (
     <ToastProvider>
       <div>
-        <Navbar />
+        <Navbar user={user} onLogout={logout} />
 
         <main>
           <div className="container">
             <Routes>
-              <Route path="/" element={<Home />} />
-
-              {/* ✅ frontend-only routes */}
+              <Route path="/" element={<Home user={user} />} />
               <Route
                 path="/dashboard"
-                element={<Dashboard currentCrop={currentCrop} setCrops={setCrops} />}
+                element={
+                  <ProtectedRoute authReady={authReady} user={user}>
+                    <Dashboard currentCrop={currentCrop} setCrops={setCrops} />
+                  </ProtectedRoute>
+                }
               />
-
               <Route
                 path="/crops"
                 element={
-                  <Crops
-                    crops={crops}
-                    setCrops={setCrops}
-                    currentCropId={currentCropId}
-                    setCurrentCropId={setCurrentCropId}
-                  />
+                  <ProtectedRoute authReady={authReady} user={user}>
+                    <Crops
+                      crops={crops}
+                      setCrops={setCrops}
+                      currentCropId={currentCropId}
+                      setCurrentCropId={chooseCurrentCrop}
+                    />
+                  </ProtectedRoute>
                 }
               />
-
               <Route path="/learn" element={<Learn />} />
               <Route path="/about" element={<About />} />
-
               <Route
                 path="/library"
                 element={
-                  <CropLibrary
-                    crops={crops}
-                    setCrops={setCrops}
-                    currentCropId={currentCropId}
-                    setCurrentCropId={setCurrentCropId}
-                  />
+                  <ProtectedRoute authReady={authReady} user={user}>
+                    <CropLibrary
+                      crops={crops}
+                      setCrops={setCrops}
+                      currentCropId={currentCropId}
+                      currentCrop={currentCrop}
+                    />
+                  </ProtectedRoute>
                 }
               />
-
-              {/* ✅ kill auth pages completely */}
-              <Route path="/login" element={<Navigate to="/" replace />} />
-              <Route path="/register" element={<Navigate to="/" replace />} />
-
+              <Route
+                path="/login"
+                element={user ? <Navigate to="/dashboard" replace /> : <Login onAuthenticated={loadAccount} />}
+              />
+              <Route
+                path="/register"
+                element={user ? <Navigate to="/dashboard" replace /> : <Register onAuthenticated={loadAccount} />}
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

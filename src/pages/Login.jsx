@@ -1,48 +1,36 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { api } from "../services/api";
 import "../styles/login.css";
 
-function Login() {
+function Login({ onAuthenticated }) {
   const navigate = useNavigate();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError("");
-
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password;
-
-    if (!cleanEmail || !cleanPassword) {
-      setError("Email and password are required");
-      return;
-    }
-
-    if (!cleanEmail.includes("@")) {
-      setError("Enter a valid email");
-      return;
-    }
-
     setLoading(true);
-
-    localStorage.setItem("token", "demo-token");
-    localStorage.setItem(
-      "user",
-      JSON.stringify({ id: "demo", email: cleanEmail })
-    );
-
-    navigate("/dashboard");
+    try {
+      const result = await api.login({ email: email.trim().toLowerCase(), password });
+      await onAuthenticated(result.user);
+      navigate("/dashboard");
+    } catch (requestError) {
+      setError(requestError.message || "Could not sign in. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Sign in</h1>
-        <p className="auth-subtitle">Access your Shamba Smart dashboard.</p>
+        <p className="auth-kicker">Your field journal</p>
+        <h1>Welcome back</h1>
+        <p className="auth-subtitle">Sign in to review your crops and irrigation notes.</p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-field">
@@ -51,33 +39,32 @@ function Login() {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@gmail.com"
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
               autoComplete="email"
+              required
             />
           </div>
-
           <div className="auth-field">
             <label htmlFor="password">Password</label>
             <input
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Your password"
               autoComplete="current-password"
+              required
             />
           </div>
-
-          {error ? <div className="auth-error">{error}</div> : null}
-
+          {error ? <div className="auth-error" role="alert">{error}</div> : null}
           <button className="auth-btn" type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Login"}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
 
         <p className="auth-link-text">
-          No account? <Link to="/register">Create one</Link>
+          New to Shamba-Smart? <Link to="/register">Create an account</Link>
         </p>
       </div>
     </div>

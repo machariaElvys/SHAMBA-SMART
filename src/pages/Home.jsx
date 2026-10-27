@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import "../styles/home.css";
 
-function Home() {
+function Home({ user }) {
   return (
     <div className="home">
       {/* HERO */}
@@ -14,17 +14,21 @@ function Home() {
           </h1>
 
           <p className="home-subtitle">
-            Track crop conditions, record irrigation actions, and get clear insights from
-            simulated real-time moisture and temperature data — built for future sensor/API integration.
+            Track crop profiles and watering actions alongside local weather and modeled soil readings, with clear notes about what the data represents.
           </p>
 
           <div className="home-cta">
-            <Link className="btn" to="/dashboard">
-              Open Dashboard
-            </Link>
-            <Link className="btn btn-outline" to="/crops">
-              Manage Crops
-            </Link>
+            {user ? (
+              <>
+                <Link className="btn" to="/dashboard">Open dashboard</Link>
+                <Link className="btn btn-outline" to="/crops">Manage crops</Link>
+              </>
+            ) : (
+              <>
+                <Link className="btn" to="/register">Create your account</Link>
+                <Link className="btn btn-outline" to="/login">Sign in</Link>
+              </>
+            )}
           </div>
 
           <div className="home-proof">
@@ -37,6 +41,7 @@ function Home() {
 
         <div className="home-hero-panel">
           <div className="panel-card">
+            <p className="panel-kicker">Example field snapshot</p>
             <div className="panel-row">
               <span className="panel-label">Current Crop</span>
               <span className="panel-value">Maize</span>
@@ -108,7 +113,7 @@ function Home() {
           <div className="how-step">
             <p className="how-number">01</p>
             <h3>Environment</h3>
-            <p>Moisture and temperature update over time (simulated real-time).</p>
+            <p>Weather and modeled moisture refresh periodically; reading snapshots build over time.</p>
           </div>
 
           <div className="how-step">
@@ -124,14 +129,9 @@ function Home() {
           </div>
         </div>
 
-        <div className="model-line">
-          <span>Environment</span>
-          <span className="arrow">→</span>
-          <span>Crop</span>
-          <span className="arrow">→</span>
-          <span>Irrigation</span>
-          <span className="arrow">→</span>
-          <span>Health</span>
+        <div className="field-note">
+          <span className="field-note-label">Field note</span>
+          <p>Readings, crop targets, and watering history stay together in one account.</p>
         </div>
       </section>
 
@@ -141,12 +141,21 @@ function Home() {
           <div>
             <h2 className="cta-foot-title">Ready to monitor your farm?</h2>
             <p className="cta-foot-subtitle">
-              Start with crops, then switch to the dashboard for live monitoring and irrigation controls.
+              Save your crop profiles, review environmental readings, and keep a history of irrigation actions.
             </p>
           </div>
           <div className="cta-foot-actions">
-            <Link className="btn" to="/crops">Add Crops</Link>
-            <Link className="btn btn-outline" to="/dashboard">View Dashboard</Link>
+            {user ? (
+              <>
+                <Link className="btn" to="/crops">Add crops</Link>
+                <Link className="btn btn-outline" to="/dashboard">View dashboard</Link>
+              </>
+            ) : (
+              <>
+                <Link className="btn" to="/register">Create account</Link>
+                <Link className="btn btn-outline" to="/login">Sign in</Link>
+              </>
+            )}
           </div>
         </div>
       </section>

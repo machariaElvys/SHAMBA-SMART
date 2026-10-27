@@ -1,5 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
+from pathlib import Path
 
 from .config import Config
 from .extensions import db, migrate, jwt
@@ -9,8 +10,13 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    if not app.config.get("SQLALCHEMY_DATABASE_URI"):
-        raise RuntimeError("DATABASE_URL is missing. Set it in your .env file.")
+    jwt_secret = app.config.get("JWT_SECRET_KEY")
+    if not jwt_secret or jwt_secret.startswith("replace-with-"):
+        raise RuntimeError(
+            "JWT_SECRET_KEY is missing. Set a long random value in src/backend/.env."
+        )
+
+    Path(app.config["INSTANCE_DIR"]).mkdir(parents=True, exist_ok=True)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -21,7 +27,7 @@ def create_app():
 
     CORS(
         app,
-        resources={r"/api/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}},
+        resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}},
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     )

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "../styles/cropLibrary.css";
 import { useToast } from "../components/ToastProvider";
+import { api } from "../services/api";
 import {
   fetchWikidataScientificName,
   fetchWikipediaSummary,
@@ -33,7 +34,7 @@ function targetsForTitle(title) {
   return TARGETS[key] || DEFAULT_TARGETS;
 }
 
-function CropLibrary({ crops = [], setCrops, currentCropId }) {
+function CropLibrary({ setCrops, currentCropId, currentCrop }) {
   const { notify } = useToast();
 
   const [query, setQuery] = useState("");
@@ -44,12 +45,8 @@ function CropLibrary({ crops = [], setCrops, currentCropId }) {
 
   const [loadingList, setLoadingList] = useState(false);
   const [loadingInfo, setLoadingInfo] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [error, setError] = useState("");
-
-  const currentCrop = useMemo(() => {
-    if (!currentCropId) return null;
-    return crops.find((c) => c.id === currentCropId) || null;
-  }, [crops, currentCropId]);
 
   const selectedTargets = useMemo(() => {
     if (!selectedTitle) return DEFAULT_TARGETS;
@@ -137,7 +134,7 @@ function CropLibrary({ crops = [], setCrops, currentCropId }) {
     };
   }, [selectedTitle]);
 
-  const applyToCurrentCrop = () => {
+  const applyToCurrentCrop = async () => {
     if (!currentCropId || !currentCrop) {
       notify("Add a crop and set it as current first.", "warning");
       return;
@@ -148,20 +145,21 @@ function CropLibrary({ crops = [], setCrops, currentCropId }) {
       return;
     }
 
-    setCrops((prev) =>
-      prev.map((c) =>
-        c.id === currentCropId
-          ? {
-              ...c,
-              profileLabel: selectedTargets.label,
-              idealMoisture: selectedTargets.idealMoisture,
-              idealTemp: selectedTargets.idealTemp,
-            }
-          : c
-      )
-    );
-
-    notify(`Applied profile to current crop: ${currentCrop.name}.`, "success");
+    const updates = {
+      profileLabel: selectedTargets.label,
+      idealMoisture: selectedTargets.idealMoisture,
+      idealTemp: selectedTargets.idealTemp,
+    };
+    setApplying(true);
+    try {
+      const saved = await api.updateCrop(currentCropId, updates);
+      setCrops((prev) => prev.map((crop) => (crop.id === saved.id ? saved : crop)));
+      notify(`Applied profile to current crop: ${currentCrop.name}.`, "success");
+    } catch (requestError) {
+      notify(requestError.message || "Could not save this crop profile.", "error");
+    } finally {
+      setApplying(false);
+    }
   };
 
   return (
@@ -269,10 +267,10 @@ function CropLibrary({ crops = [], setCrops, currentCropId }) {
                   type="button"
                   className="lib-btn-outline"
                   onClick={applyToCurrentCrop}
-                  disabled={!currentCropId}
+                  disabled={!currentCropId || applying}
                   title={!currentCropId ? "Add a crop first and set it as current." : "Apply targets to your current crop."}
                 >
-                  Apply to Current Crop
+                  {applying ? "Saving profile…" : "Apply to Current Crop"}
                 </button>
               </div>
 

@@ -1,59 +1,46 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import "../styles/auth.css"; // or "../styles/login.css" if that's what you're using
+import { api } from "../services/api";
+import "../styles/auth.css";
 
-function Register() {
+function Register({ onAuthenticated }) {
   const navigate = useNavigate();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError("");
-
-    const cleanEmail = email.trim().toLowerCase();
-
-    if (!cleanEmail || !password || !confirmPassword) {
-      setError("All fields are required");
+    if (password.length < 8) {
+      setError("Use a password with at least 8 characters.");
       return;
     }
-
-    if (!cleanEmail.includes("@")) {
-      setError("Enter a valid email");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return;
-    }
-
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError("The passwords do not match.");
       return;
     }
 
     setLoading(true);
-
-    // FRONTEND ONLY (fake account/session)
-    localStorage.setItem("token", "demo-token");
-    localStorage.setItem(
-      "user",
-      JSON.stringify({ id: "demo", email: cleanEmail })
-    );
-
-    navigate("/dashboard");
+    try {
+      const result = await api.register({ email: email.trim().toLowerCase(), password });
+      await onAuthenticated(result.user);
+      navigate("/dashboard");
+    } catch (requestError) {
+      setError(requestError.message || "Could not create the account. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Create account</h1>
-        <p className="auth-subtitle">Register with your own email and password.</p>
+        <p className="auth-kicker">A record for your farm</p>
+        <h1>Create your account</h1>
+        <p className="auth-subtitle">Your crop list and field notes will be saved to your account.</p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-field">
@@ -62,40 +49,42 @@ function Register() {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@gmail.com"
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
               autoComplete="email"
+              maxLength={120}
+              required
             />
           </div>
-
           <div className="auth-field">
             <label htmlFor="password">Password</label>
             <input
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="At least 8 characters"
               autoComplete="new-password"
+              minLength={8}
+              required
             />
           </div>
-
           <div className="auth-field">
-            <label htmlFor="confirmPassword">Confirm Password</label>
+            <label htmlFor="confirmPassword">Confirm password</label>
             <input
               id="confirmPassword"
               type="password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm password"
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              placeholder="Enter it again"
               autoComplete="new-password"
+              minLength={8}
+              required
             />
           </div>
-
-          {error ? <div className="auth-error">{error}</div> : null}
-
+          {error ? <div className="auth-error" role="alert">{error}</div> : null}
           <button className="auth-btn" type="submit" disabled={loading}>
-            {loading ? "Registering..." : "Register"}
+            {loading ? "Creating account…" : "Create account"}
           </button>
         </form>
 

@@ -10,6 +10,7 @@ class Crop(db.Model):
     __tablename__ = "crops"
 
     id = db.Column(db.String(36), primary_key=True, default=uuid_str)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     name = db.Column(db.String(120), nullable=False)
     stage = db.Column(db.String(40), nullable=False, default="Seedling")
 
@@ -26,6 +27,7 @@ class Crop(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    owner = db.relationship("User", back_populates="crops")
     logs = db.relationship("IrrigationLog", backref="crop", cascade="all, delete-orphan")
 
     def to_dict(self):
@@ -73,6 +75,7 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    crops = db.relationship("Crop", back_populates="owner", cascade="all, delete-orphan")
 
     def set_password(self, password: str):
         self.password_hash = generate_password_hash(password)

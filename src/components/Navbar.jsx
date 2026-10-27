@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import "../styles/navbar.css";
 
-function Navbar() {
+function Navbar({ user, onLogout }) {
   const [open, setOpen] = useState(false);
 
   const closeMenu = () => setOpen(false);
@@ -33,17 +33,19 @@ function Navbar() {
             </NavLink>
           </li>
 
-          <li>
-            <NavLink to="/dashboard" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-              Dashboard
-            </NavLink>
-          </li>
-
-          <li>
-            <NavLink to="/crops" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-              Crops
-            </NavLink>
-          </li>
+          {user ? (
+            <>
+              <li>
+                <NavLink to="/dashboard" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>Dashboard</NavLink>
+              </li>
+              <li>
+                <NavLink to="/crops" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>Crops</NavLink>
+              </li>
+              <li>
+                <NavLink to="/library" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>Crop Library</NavLink>
+              </li>
+            </>
+          ) : null}
 
           <li>
             <NavLink to="/learn" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
@@ -52,28 +54,26 @@ function Navbar() {
           </li>
 
           <li>
-            <NavLink to="/library" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-              Crop Library
-            </NavLink>
-          </li>
-
-          <li>
-            <NavLink to="/about" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
+            <NavLink to="/about" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}> 
               About
             </NavLink>
           </li>
 
-          <li>
-            <NavLink to="/login" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-              Login
-            </NavLink>
-          </li>
-
-          <li>
-            <NavLink to="/register" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>
-              Register
-            </NavLink>
-          </li>
+          {user ? (
+            <li className="nav-account">
+              <span className="nav-user">{user.email}</span>
+              <button className="nav-logout" type="button" onClick={() => { closeMenu(); onLogout(); }}>Sign out</button>
+            </li>
+          ) : (
+            <>
+              <li>
+                <NavLink to="/login" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>Sign in</NavLink>
+              </li>
+              <li>
+                <NavLink to="/register" onClick={closeMenu} className={({ isActive }) => (isActive ? "active" : "")}>Create account</NavLink>
+              </li>
+            </>
+          )}
         </ul>
       </div>
 

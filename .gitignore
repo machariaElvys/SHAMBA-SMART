@@ -11,6 +11,16 @@ node_modules
 dist
 dist-ssr
 *.local
+**/.env
+**/.env.*
+!**/.env.example
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+src/backend/instance/
+*.db
+*.sqlite
+*.sqlite3
 
 # Editor directories and files
 .vscode/*

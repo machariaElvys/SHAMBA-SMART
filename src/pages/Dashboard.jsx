@@ -5,6 +5,7 @@ import "../styles/dashboard.css";
 import { fetchCurrentWeather } from "../services/weather";
 import { reverseGeocodeLabel } from "../services/geocode";
 import { fetchSoilMoisturePercent } from "../services/soilMoisture";
+import { api } from "../services/api";
 
 function clamp(num, min, max) {
   return Math.max(min, Math.min(max, num));
@@ -19,24 +20,12 @@ function healthLabel(score) {
 
 function trend(current, previous) {
   if (previous === undefined || previous === null) return "";
-  if (current > previous) return "↑";
-  if (current < previous) return "↓";
-  return "→";
+  if (current > previous) return "Rising";
+  if (current < previous) return "Falling";
+  return "Steady";
 }
 
 function Dashboard({ currentCrop, setCrops }) {
-  if (!currentCrop) {
-    return (
-      <div className="dashboard">
-        <h1>Farm Dashboard</h1>
-        <div className="farm-status">
-          <h2>No crops yet</h2>
-          <p>Go to the Crops page and add your first crop to start monitoring.</p>
-        </div>
-      </div>
-    );
-  }
-
   // Sensor states
   const [temperature, setTemperature] = useState(28);
   const [moisture, setMoisture] = useState(65);
@@ -62,18 +51,20 @@ function Dashboard({ currentCrop, setCrops }) {
 
   // Irrigation log (last 5)
   const [irrigationLog, setIrrigationLog] = useState([]);
+  const [irrigationError, setIrrigationError] = useState("");
 
   // Controls
   const [paused, setPaused] = useState(false);
   const [tickMs, setTickMs] = useState(3000);
 
   // Crop profile ranges
-  const idealMoisture = currentCrop.idealMoisture ?? { min: 55, max: 70 };
-  const idealTemp = currentCrop.idealTemp ?? { min: 24, max: 32 };
-  const profileLabel = currentCrop.profileLabel ?? "Generic profile";
+  const idealMoisture = currentCrop?.idealMoisture ?? { min: 55, max: 70 };
+  const idealTemp = currentCrop?.idealTemp ?? { min: 24, max: 32 };
+  const profileLabel = currentCrop?.profileLabel ?? "Generic profile";
 
   // Update only current crop
   const updateCurrentCrop = (patchOrFn) => {
+    if (!currentCrop) return;
     setCrops((prev) =>
       prev.map((c) => {
         if (c.id !== currentCrop.id) return c;
@@ -85,14 +76,59 @@ function Dashboard({ currentCrop, setCrops }) {
 
   // Log irrigation event
   const pushLog = (type, before, after) => {
+    if (!currentCrop) return;
+    const localId = crypto.randomUUID();
     setIrrigationLog((prev) => {
       const next = [
-        { id: crypto.randomUUID(), t: Date.now(), type, before, after },
+        { id: localId, t: Date.now(), type, before, after },
         ...prev,
       ];
       return next.slice(0, 5);
     });
+    setIrrigationError("");
+    api.recordIrrigation(currentCrop.id, { type, before, after })
+      .then((saved) => {
+        setIrrigationLog((prev) => prev.map((entry) => entry.id === localId
+          ? { ...saved, t: new Date(saved.createdAt).getTime() }
+          : entry));
+      })
+      .catch((error) => setIrrigationError(error.message || "Could not save this irrigation event."));
   };
+
+  useEffect(() => {
+    if (!currentCrop) {
+      setIrrigationLog([]);
+      return undefined;
+    }
+    let active = true;
+    api.getIrrigationLog(currentCrop.id)
+      .then((logs) => {
+        if (!active) return;
+        setIrrigationLog(logs.map((entry) => ({
+          ...entry,
+          t: new Date(entry.createdAt).getTime(),
+        })));
+      })
+      .catch((error) => {
+        if (active) setIrrigationError(error.message || "Could not load irrigation history.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [currentCrop?.id]);
+
+  const healthSync = useRef(null);
+  useEffect(() => {
+    if (!currentCrop) {
+      healthSync.current = null;
+      return;
+    }
+    const previous = healthSync.current;
+    healthSync.current = { id: currentCrop.id, health: currentCrop.health };
+    if (previous?.id === currentCrop.id && previous.health !== currentCrop.health) {
+      api.updateCrop(currentCrop.id, { health: currentCrop.health }).catch(() => {});
+    }
+  }, [currentCrop?.id, currentCrop?.health]);
 
   // Keep latest sensor values without restarting intervals
   const tempRef = useRef(temperature);
@@ -191,7 +227,7 @@ function Dashboard({ currentCrop, setCrops }) {
         setMoisture(m.percent);
       } catch {
         if (!cancelled) {
-          setMoistureError("Failed to load live soil moisture. Keeping last known values.");
+          setMoistureError("Could not load the soil-moisture estimate. Keeping the last value.");
         }
       } finally {
         if (!cancelled) setMoistureLoading(false);
@@ -209,7 +245,7 @@ function Dashboard({ currentCrop, setCrops }) {
 
   // Interval for time passing + history snapshots
   useEffect(() => {
-    if (paused) return;
+    if (paused || !currentCrop) return;
 
     const interval = setInterval(() => {
       setHistory((prev) => {
@@ -225,16 +261,24 @@ function Dashboard({ currentCrop, setCrops }) {
         return next.slice(0, 10);
       });
 
-      updateCurrentCrop((c) => ({
-        lastWateredMinutes: (c.lastWateredMinutes ?? 0) + Math.round(tickMs / 1000),
-      }));
     }, tickMs);
 
     return () => clearInterval(interval);
-  }, [currentCrop.id, tickMs, paused]);
+  }, [currentCrop?.id, tickMs, paused]);
+
+  useEffect(() => {
+    if (paused || !currentCrop) return;
+    const interval = setInterval(() => {
+      updateCurrentCrop((crop) => ({
+        lastWateredMinutes: (crop.lastWateredMinutes ?? 0) + 1,
+      }));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [currentCrop?.id, paused]);
 
   // Health logic
   useEffect(() => {
+    if (!currentCrop) return;
     let delta = 0;
 
     if (moisture < idealMoisture.min) delta -= 3;
@@ -254,7 +298,7 @@ function Dashboard({ currentCrop, setCrops }) {
     temperature,
     moisture,
     weather,
-    currentCrop.id,
+    currentCrop?.id,
     idealMoisture.min,
     idealMoisture.max,
     idealTemp.min,
@@ -263,7 +307,7 @@ function Dashboard({ currentCrop, setCrops }) {
 
   // Auto-water
   useEffect(() => {
-    if (!currentCrop.autoWater) return;
+    if (!currentCrop?.autoWater) return;
 
     const trigger = idealMoisture.min - 3;
     if (moisture < trigger) {
@@ -278,17 +322,14 @@ function Dashboard({ currentCrop, setCrops }) {
         health: clamp((c.health ?? 70) + 4, 0, 100),
       }));
     }
-  }, [moisture, currentCrop.autoWater, currentCrop.id, idealMoisture.min]);
+  }, [moisture, currentCrop?.autoWater, currentCrop?.id, idealMoisture.min]);
 
   // Manual water
   const waterNow = () => {
     const before = moisture;
-
-    setMoisture((m) => {
-      const after = clamp(m + 12, 0, 100);
-      pushLog("Manual", before, after);
-      return after;
-    });
+    const after = clamp(moisture + 12, 0, 100);
+    setMoisture(after);
+    pushLog("Manual", before, after);
 
     updateCurrentCrop((c) => ({
       lastWateredMinutes: 0,
@@ -297,7 +338,12 @@ function Dashboard({ currentCrop, setCrops }) {
   };
 
   const toggleAutoWater = () => {
-    updateCurrentCrop((c) => ({ autoWater: !c.autoWater }));
+    if (!currentCrop) return;
+    const autoWater = !currentCrop.autoWater;
+    updateCurrentCrop({ autoWater });
+    api.updateCrop(currentCrop.id, { autoWater }).catch((error) => {
+      setIrrigationError(error.message || "Could not save the auto-water setting.");
+    });
   };
 
   // Alerts
@@ -307,12 +353,12 @@ function Dashboard({ currentCrop, setCrops }) {
     if (temperature < idealTemp.min) a++;
     if (moisture < idealMoisture.min) a++;
     if (moisture > idealMoisture.max) a++;
-    if ((currentCrop.health ?? 70) < 40) a++;
+    if ((currentCrop?.health ?? 70) < 40) a++;
     return a;
   }, [
     temperature,
     moisture,
-    currentCrop.health,
+    currentCrop?.health,
     idealMoisture.min,
     idealMoisture.max,
     idealTemp.min,
@@ -327,12 +373,25 @@ function Dashboard({ currentCrop, setCrops }) {
 
   const stats = [
     { id: 1, title: "Temperature", value: `${temperature}°C ${tempTrend}` },
-    { id: 2, title: "Soil Moisture", value: `${moisture}% ${moistTrend}` },
+    { id: 2, title: "Estimated Moisture", value: `${moisture}% ${moistTrend}` },
     { id: 3, title: "Weather", value: weather },
     { id: 4, title: "Alerts", value: alerts },
   ];
 
-  const hl = healthLabel(currentCrop.health ?? 70);
+  const hl = healthLabel(currentCrop?.health ?? 70);
+
+  if (!currentCrop) {
+    return (
+      <div className="dashboard">
+        <p className="page-kicker">Field overview</p>
+        <h1>Farm Dashboard</h1>
+        <div className="farm-status">
+          <h2>No crops in your journal yet</h2>
+          <p>Add a crop to begin tracking field conditions and irrigation.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard">
@@ -353,7 +412,7 @@ function Dashboard({ currentCrop, setCrops }) {
       </div>
 
       <div style={{ marginTop: 6, fontSize: 13, opacity: 0.85 }}>
-        <strong>Soil moisture:</strong>
+        <strong>Soil moisture estimate:</strong>
         {moistureLoading ? " loading..." : ""}
         {moistureError ? ` (${moistureError})` : ""}
       </div>
@@ -366,8 +425,8 @@ function Dashboard({ currentCrop, setCrops }) {
 
       <div className="controls">
         <div className="controls-left">
-          <h3>Simulation Controls</h3>
-          <p>Adjust update speed or pause the live readings.</p>
+          <h3>Reading History</h3>
+          <p>Choose how often the dashboard adds a local reading snapshot.</p>
         </div>
 
         <div className="controls-right">
@@ -494,12 +553,13 @@ function Dashboard({ currentCrop, setCrops }) {
                 </span>
                 <span className="irrigation-type">{x.type}</span>
                 <span className="irrigation-change">
-                  {x.before}% → {x.after}%
+                  {x.before}% before <span aria-hidden="true">·</span> {x.after}% after
                 </span>
               </div>
             ))}
           </div>
         )}
+        {irrigationError ? <p className="irrigation-error" role="status">{irrigationError}</p> : null}
       </div>
     </div>
   );

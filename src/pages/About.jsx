@@ -48,7 +48,7 @@ function About() {
           <div className="about-highlight">
             <p className="about-highlight-title">Core idea</p>
             <p className="about-highlight-text">
-              Environment → Irrigation decisions → Crop health.
+              Field conditions, irrigation records, and crop health in one monitoring journal.
             </p>
           </div>
         </div>
@@ -69,12 +69,12 @@ function About() {
             <p>Each crop can have ideal moisture and temperature targets.</p>
           </div>
           <div className="feature">
-            <h3>Live monitoring (simulated)</h3>
-            <p>Moisture/temperature/weather update like a real monitoring dashboard.</p>
+            <h3>Current conditions</h3>
+            <p>Weather and modeled soil-moisture estimates refresh periodically for the selected location.</p>
           </div>
           <div className="feature">
             <h3>Manual irrigation</h3>
-            <p>“Water Now” represents a real irrigation action and updates crop health.</p>
+            <p>“Water Now” records the action in your account and updates the crop model.</p>
           </div>
           <div className="feature">
             <h3>Auto-water logic</h3>
@@ -98,7 +98,8 @@ function About() {
           <ul className="about-list">
             <li><strong>React</strong> — component-based UI</li>
             <li><strong>React Router</strong> — navigation</li>
-            <li><strong>CSS</strong> — clean, responsive styling</li>
+            <li><strong>Flask and SQLAlchemy</strong> — account-aware API and database</li>
+            <li><strong>CSS</strong> — field-journal inspired responsive styling</li>
           </ul>
           <p className="about-muted">
             The structure is kept simple on purpose so it’s easy to expand later.

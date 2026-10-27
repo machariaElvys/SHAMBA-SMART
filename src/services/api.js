@@ -1,12 +1,5 @@
-// src/services/api.js
-
 const TOKEN_KEY = "shambaSmart.token";
-const USER_KEY = "shambaSmart.user";
-const CROPS_KEY = "shambaSmart.crops.v1";
 
-// --------------------
-// token helpers
-// --------------------
 export function getToken() {
   try {
     return localStorage.getItem(TOKEN_KEY);
@@ -18,123 +11,93 @@ export function getToken() {
 export function setToken(token) {
   try {
     localStorage.setItem(TOKEN_KEY, token);
-  } catch {}
+  } catch {
+    // The API remains usable in browsers that block local storage for this tab.
+  }
 }
 
 export function clearToken() {
   try {
     localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-  } catch {}
-}
-
-// --------------------
-// local helpers
-// --------------------
-function readCrops() {
-  try {
-    const raw = localStorage.getItem(CROPS_KEY);
-    const data = raw ? JSON.parse(raw) : [];
-    return Array.isArray(data) ? data : [];
   } catch {
-    return [];
+    // Ignore storage restrictions while logging out.
   }
 }
 
-function writeCrops(crops) {
+async function request(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  headers.set("Accept", "application/json");
+  if (options.body !== undefined) headers.set("Content-Type", "application/json");
+
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  let response;
   try {
-    localStorage.setItem(CROPS_KEY, JSON.stringify(crops));
-  } catch {}
+    response = await fetch(`/api${path}`, { ...options, headers });
+  } catch {
+    throw new Error("Could not reach the Shamba-Smart server. Start the backend and try again.");
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  const body = contentType.includes("application/json") ? await response.json() : null;
+  if (!response.ok) {
+    const error = new Error(body?.error || `Request failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+  return body;
 }
 
-function makeId() {
-  return `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+async function authenticate(path, credentials) {
+  const result = await request(path, {
+    method: "POST",
+    body: JSON.stringify(credentials),
+  });
+  setToken(result.access_token);
+  return { token: result.access_token, user: result.user };
 }
 
-// --------------------
-// fake frontend-only API
-// --------------------
 export const api = {
-  // auth (mock)
-  async login({ email, password } = {}) {
-    if (!email || !password) {
-      throw new Error("email and password are required");
-    }
-
-    const token = "demo-token";
-    const user = { id: "demo", email };
-
-    setToken(token);
-    try {
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-    } catch {}
-
-    return { token, user };
+  login(credentials) {
+    return authenticate("/auth/login", credentials);
   },
 
-  async register({ email, password } = {}) {
-    if (!email || !password) {
-      throw new Error("email and password are required");
-    }
-
-    // frontend-only demo register = auto login
-    const token = "demo-token";
-    const user = { id: "demo", email };
-
-    setToken(token);
-    try {
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-    } catch {}
-
-    return { token, user };
+  register(credentials) {
+    return authenticate("/auth/register", credentials);
   },
 
-  // crops
-  async getCrops() {
-    return readCrops();
+  async me() {
+    return request("/auth/me");
   },
 
-  async addCrop(payload = {}) {
-    const crops = readCrops();
-
-    const newCrop = {
-      id: makeId(),
-      name: payload.name || "New Crop",
-      stage: payload.stage || "Seedling",
-      health: typeof payload.health === "number" ? payload.health : 80,
-      ...payload,
-    };
-
-    crops.push(newCrop);
-    writeCrops(crops);
-
-    return newCrop;
+  getCrops() {
+    return request("/crops");
   },
 
-  // alias in case your page calls createCrop instead of addCrop
-  async createCrop(payload = {}) {
-    return this.addCrop(payload);
+  createCrop(payload) {
+    return request("/crops", { method: "POST", body: JSON.stringify(payload) });
   },
 
-  async updateCrop(id, updates = {}) {
-    const crops = readCrops();
-
-    const index = crops.findIndex((c) => String(c.id) === String(id));
-    if (index === -1) throw new Error("Crop not found");
-
-    const updated = { ...crops[index], ...updates };
-    crops[index] = updated;
-
-    writeCrops(crops);
-    return updated;
+  updateCrop(id, updates) {
+    return request(`/crops/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    });
   },
 
-  async deleteCrop(id) {
-    const crops = readCrops();
-    const next = crops.filter((c) => String(c.id) !== String(id));
+  deleteCrop(id) {
+    return request(`/crops/${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
 
-    writeCrops(next);
+  getIrrigationLog(cropId) {
+    return request(`/crops/${encodeURIComponent(cropId)}/irrigation`);
+  },
 
-    return { ok: true };
+  recordIrrigation(cropId, event) {
+    return request(`/crops/${encodeURIComponent(cropId)}/irrigation`, {
+      method: "POST",
+      body: JSON.stringify(event),
+    });
   },
 };
