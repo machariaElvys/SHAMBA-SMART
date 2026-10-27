@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 720" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Morning over a cultivated East African field</title>
+  <desc id="desc">A warm sun rises above layered green hills and carefully planted field rows.</desc>
+  <defs>
+    <linearGradient id="sky" x1="490" y1="0" x2="490" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAD9B9"/><stop offset="1" stop-color="#F5EBD7"/>
+    </linearGradient>
+    <linearGradient id="field" x1="500" y1="320" x2="500" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#809556"/><stop offset="1" stop-color="#314D35"/>
+    </linearGradient>
+    <clipPath id="frame"><rect width="980" height="720" rx="4"/></clipPath>
+  </defs>
+  <g clip-path="url(#frame)">
+    <path fill="url(#sky)" d="M0 0h980v720H0z"/>
+    <circle cx="726" cy="183" r="82" fill="#D6A446"/>
+    <circle cx="726" cy="183" r="108" stroke="#D6A446" stroke-opacity=".24" stroke-width="2"/>
+    <path d="M0 330c125-74 226-61 328-13 79 37 157 53 255-9 116-73 247-103 397-28v173H0V330Z" fill="#89936C"/>
+    <path d="M0 389c112-51 205-38 304 7 100 46 195 51 292-4 110-62 245-96 384-43v184H0V389Z" fill="#536D4A"/>
+    <path d="M0 455c123-38 235-20 332 26 112 53 231 42 328-8 109-57 218-68 320-39v286H0V455Z" fill="url(#field)"/>
+    <path d="M492 430C420 518 330 609 220 720M505 427c-17 99-29 195-34 293M523 428c50 104 111 204 193 292M540 432c120 90 224 182 321 288M475 433C332 494 197 570 56 670M563 439c134 67 261 145 395 231" stroke="#D3B36C" stroke-opacity=".52" stroke-width="3"/>
+    <path d="M0 520c172-31 310 18 463 30 166 13 316-56 517-40M0 592c161-28 291 9 449 26 180 19 345-48 531-37M0 660c156-23 293 6 450 17 186 13 352-35 530-27" stroke="#E5CB8B" stroke-opacity=".26" stroke-width="2"/>
+    <g stroke="#294B35" stroke-linecap="round" stroke-width="4">
+      <path d="M141 506c-2-25-1-45 3-65m0 28c-21-17-31-32-34-47 20 5 33 18 37 37m-5-9c13-24 27-37 42-41-1 19-12 35-37 49"/>
+      <path d="M833 485c-2-25-1-45 3-65m0 28c-21-17-31-32-34-47 20 5 33 18 37 37m-5-9c13-24 27-37 42-41-1 19-12 35-37 49"/>
+      <path d="M356 449c-1-19 0-35 3-51m0 23c-17-14-26-27-28-39 17 4 27 15 30 31m-4-7c11-20 22-30 35-34-1 16-10 29-31 41"/>
+    </g>
+    <path d="M0 0h980v720H0z" fill="#223A2D" fill-opacity=".035"/>
+  </g>
+</svg>

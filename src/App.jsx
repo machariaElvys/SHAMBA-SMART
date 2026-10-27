@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -11,166 +11,114 @@ import Crops from "./pages/Crops";
 import Learn from "./pages/Learn";
 import About from "./pages/About";
 import CropLibrary from "./pages/cropLibrary";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import { api, clearToken, getToken } from "./services/api";
+import { cropStorage } from "./services/cropStorage";
+import { journalStorage } from "./services/journalStorage";
 
-function ProtectedRoute({ authReady, user, children }) {
-  if (!authReady) return <div className="app-state">Opening your field journal…</div>;
-  return user ? children : <Navigate to="/login" replace />;
-}
-
-function currentCropStorageKey(accountId) {
-  return "shambaSmart.currentCropId." + accountId;
-}
+const STORAGE_CURRENT_KEY = "shambaSmart.currentCropId.v1";
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [crops, setCrops] = useState([]);
-  const [currentCropId, setCurrentCropId] = useState(null);
+  const [crops, setCrops] = useState(() => cropStorage.getAll());
+  const [notes, setNotes] = useState(() => journalStorage.getNotes());
+  const [tasks, setTasks] = useState(() => journalStorage.getTasks());
+  const [irrigation, setIrrigation] = useState(() => journalStorage.getIrrigation());
 
-  const restoreCropSelection = (account, accountCrops) => {
-    let savedId = null;
+  const [currentCropId, setCurrentCropId] = useState(() => {
     try {
-      savedId = localStorage.getItem(currentCropStorageKey(account.id));
+      return localStorage.getItem(STORAGE_CURRENT_KEY) || null;
     } catch {
-      savedId = null;
+      return null;
     }
-    const selectedId = accountCrops.some((crop) => crop.id === savedId)
-      ? savedId
-      : accountCrops[0]?.id ?? null;
-    setCurrentCropId(selectedId);
-  };
-
-  const chooseCurrentCrop = (cropId) => {
-    setCurrentCropId(cropId);
-    if (!user) return;
-    try {
-      const key = currentCropStorageKey(user.id);
-      if (cropId) localStorage.setItem(key, cropId);
-      else localStorage.removeItem(key);
-    } catch {
-      // Selection remains active for this session if storage is unavailable.
-    }
-  };
-
-  const loadAccount = async (account) => {
-    setAuthReady(false);
-    setUser(account);
-    setCrops([]);
-    setCurrentCropId(null);
-    try {
-      const accountCrops = await api.getCrops();
-      setCrops(accountCrops);
-      restoreCropSelection(account, accountCrops);
-    } catch {
-      setCrops([]);
-    } finally {
-      setAuthReady(true);
-    }
-  };
+  });
 
   useEffect(() => {
-    let active = true;
+    cropStorage.saveAll(crops);
+  }, [crops]);
 
-    async function restoreSession() {
-      if (!getToken()) {
-        setAuthReady(true);
-        return;
-      }
+  useEffect(() => { journalStorage.saveNotes(notes); }, [notes]);
+  useEffect(() => { journalStorage.saveTasks(tasks); }, [tasks]);
+  useEffect(() => { journalStorage.saveIrrigation(irrigation); }, [irrigation]);
 
-      try {
-        const result = await api.me();
-        if (!active) return;
-        setUser(result.user);
-        const accountCrops = await api.getCrops();
-        if (!active) return;
-        setCrops(accountCrops);
-        restoreCropSelection(result.user, accountCrops);
-      } catch (error) {
-        if (error.status === 401) clearToken();
-        if (active) {
-          setUser(null);
-          setCrops([]);
-          setCurrentCropId(null);
-        }
-      } finally {
-        if (active) setAuthReady(true);
-      }
+  const effectiveCurrentCropId = crops.some((crop) => crop.id === currentCropId)
+    ? currentCropId
+    : crops[0]?.id || null;
+
+  useEffect(() => {
+    try {
+      if (effectiveCurrentCropId) localStorage.setItem(STORAGE_CURRENT_KEY, effectiveCurrentCropId);
+      else localStorage.removeItem(STORAGE_CURRENT_KEY);
+    } catch {
+      // The app remains usable when browser storage is disabled.
     }
-
-    restoreSession();
-    return () => {
-      active = false;
-    };
-  }, []);
+  }, [effectiveCurrentCropId]);
 
   const currentCrop = useMemo(() => {
     if (crops.length === 0) return null;
-    return crops.find((crop) => crop.id === currentCropId) || crops[0];
-  }, [crops, currentCropId]);
-
-  const logout = () => {
-    clearToken();
-    setUser(null);
-    setCrops([]);
-    setCurrentCropId(null);
-  };
+    return crops.find((c) => c.id === effectiveCurrentCropId) || crops[0];
+  }, [crops, effectiveCurrentCropId]);
 
   return (
     <ToastProvider>
       <div>
-        <Navbar user={user} onLogout={logout} />
+        <Navbar />
 
         <main>
           <div className="container">
             <Routes>
-              <Route path="/" element={<Home user={user} />} />
+              <Route path="/" element={<Home crops={crops} currentCrop={currentCrop} />} />
+
+              {/* ✅ frontend-only routes */}
               <Route
                 path="/dashboard"
                 element={
-                  <ProtectedRoute authReady={authReady} user={user}>
-                    <Dashboard currentCrop={currentCrop} setCrops={setCrops} />
-                  </ProtectedRoute>
+                  <Dashboard
+                    crops={crops}
+                    currentCrop={currentCrop}
+                    currentCropId={effectiveCurrentCropId}
+                    setCurrentCropId={setCurrentCropId}
+                    setCrops={setCrops}
+                    notes={notes}
+                    setNotes={setNotes}
+                    tasks={tasks}
+                    setTasks={setTasks}
+                    irrigation={irrigation}
+                    setIrrigation={setIrrigation}
+                  />
                 }
               />
+
               <Route
                 path="/crops"
                 element={
-                  <ProtectedRoute authReady={authReady} user={user}>
-                    <Crops
-                      crops={crops}
-                      setCrops={setCrops}
-                      currentCropId={currentCropId}
-                      setCurrentCropId={chooseCurrentCrop}
-                    />
-                  </ProtectedRoute>
+                  <Crops
+                    crops={crops}
+                    setCrops={setCrops}
+                    currentCropId={effectiveCurrentCropId}
+                    setCurrentCropId={setCurrentCropId}
+                    notes={notes}
+                    setNotes={setNotes}
+                  />
                 }
               />
+
               <Route path="/learn" element={<Learn />} />
               <Route path="/about" element={<About />} />
+
               <Route
                 path="/library"
                 element={
-                  <ProtectedRoute authReady={authReady} user={user}>
-                    <CropLibrary
-                      crops={crops}
-                      setCrops={setCrops}
-                      currentCropId={currentCropId}
-                      currentCrop={currentCrop}
-                    />
-                  </ProtectedRoute>
+                  <CropLibrary
+                    crops={crops}
+                    setCrops={setCrops}
+                    currentCropId={effectiveCurrentCropId}
+                    setCurrentCropId={setCurrentCropId}
+                  />
                 }
               />
-              <Route
-                path="/login"
-                element={user ? <Navigate to="/dashboard" replace /> : <Login onAuthenticated={loadAccount} />}
-              />
-              <Route
-                path="/register"
-                element={user ? <Navigate to="/dashboard" replace /> : <Register onAuthenticated={loadAccount} />}
-              />
+
+              {/* Authentication is outside the scope of this local-first demo. */}
+              <Route path="/login" element={<Navigate to="/" replace />} />
+              <Route path="/register" element={<Navigate to="/" replace />} />
+
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

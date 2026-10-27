@@ -1,566 +1,189 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import StatCard from "../components/StatCard";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import "../styles/dashboard.css";
-
 import { fetchCurrentWeather } from "../services/weather";
 import { reverseGeocodeLabel } from "../services/geocode";
 import { fetchSoilMoisturePercent } from "../services/soilMoisture";
-import { api } from "../services/api";
+import { journalStorage } from "../services/journalStorage";
 
-function clamp(num, min, max) {
-  return Math.max(min, Math.min(max, num));
+const DEFAULT_LOCATION = { label: "Nairobi, Kenya", lat: -1.286389, lon: 36.817223 };
+
+function timeSince(dateValue) {
+  if (!dateValue) return "Not logged yet";
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(dateValue).getTime()) / 60000));
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr${hours === 1 ? "" : "s"} ago`;
+  return `${Math.floor(hours / 24)} days ago`;
 }
 
-function healthLabel(score) {
-  if (score >= 80) return { text: "Excellent", cls: "health-good" };
-  if (score >= 60) return { text: "Good", cls: "health-mid" };
-  if (score >= 40) return { text: "Warning", cls: "health-warn" };
-  return { text: "Critical", cls: "health-critical" };
-}
-
-function trend(current, previous) {
-  if (previous === undefined || previous === null) return "";
-  if (current > previous) return "Rising";
-  if (current < previous) return "Falling";
-  return "Steady";
-}
-
-function Dashboard({ currentCrop, setCrops }) {
-  // Sensor states
-  const [temperature, setTemperature] = useState(28);
-  const [moisture, setMoisture] = useState(65);
-  const [weather, setWeather] = useState("Clear");
-
-  // Location
-  const [location, setLocation] = useState({
-    label: "Nairobi",
-    lat: -1.286389,
-    lon: 36.817223,
-  });
-
-  // Weather status
-  const [weatherLoading, setWeatherLoading] = useState(false);
-  const [weatherError, setWeatherError] = useState("");
-
-  // Soil moisture status
-  const [moistureLoading, setMoistureLoading] = useState(false);
-  const [moistureError, setMoistureError] = useState("");
-
-  // History (last 10)
-  const [history, setHistory] = useState([]);
-
-  // Irrigation log (last 5)
-  const [irrigationLog, setIrrigationLog] = useState([]);
-  const [irrigationError, setIrrigationError] = useState("");
-
-  // Controls
-  const [paused, setPaused] = useState(false);
-  const [tickMs, setTickMs] = useState(3000);
-
-  // Crop profile ranges
-  const idealMoisture = currentCrop?.idealMoisture ?? { min: 55, max: 70 };
-  const idealTemp = currentCrop?.idealTemp ?? { min: 24, max: 32 };
-  const profileLabel = currentCrop?.profileLabel ?? "Generic profile";
-
-  // Update only current crop
-  const updateCurrentCrop = (patchOrFn) => {
-    if (!currentCrop) return;
-    setCrops((prev) =>
-      prev.map((c) => {
-        if (c.id !== currentCrop.id) return c;
-        const patch = typeof patchOrFn === "function" ? patchOrFn(c) : patchOrFn;
-        return { ...c, ...patch };
-      })
-    );
-  };
-
-  // Log irrigation event
-  const pushLog = (type, before, after) => {
-    if (!currentCrop) return;
-    const localId = crypto.randomUUID();
-    setIrrigationLog((prev) => {
-      const next = [
-        { id: localId, t: Date.now(), type, before, after },
-        ...prev,
-      ];
-      return next.slice(0, 5);
-    });
-    setIrrigationError("");
-    api.recordIrrigation(currentCrop.id, { type, before, after })
-      .then((saved) => {
-        setIrrigationLog((prev) => prev.map((entry) => entry.id === localId
-          ? { ...saved, t: new Date(saved.createdAt).getTime() }
-          : entry));
-      })
-      .catch((error) => setIrrigationError(error.message || "Could not save this irrigation event."));
-  };
+function Dashboard({ crops, currentCrop, currentCropId, setCurrentCropId, setCrops, notes, tasks, setTasks, irrigation, setIrrigation }) {
+  const [location, setLocation] = useState(DEFAULT_LOCATION);
+  const [weather, setWeather] = useState(null);
+  const [moisture, setMoisture] = useState(null);
+  const [weatherState, setWeatherState] = useState({ loading: true, error: "" });
+  const [moistureState, setMoistureState] = useState({ loading: true, error: "" });
+  const [locationMessage, setLocationMessage] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskCropId, setTaskCropId] = useState(currentCrop?.id || "");
+  const [taskDue, setTaskDue] = useState("");
 
   useEffect(() => {
-    if (!currentCrop) {
-      setIrrigationLog([]);
-      return undefined;
-    }
-    let active = true;
-    api.getIrrigationLog(currentCrop.id)
-      .then((logs) => {
-        if (!active) return;
-        setIrrigationLog(logs.map((entry) => ({
-          ...entry,
-          t: new Date(entry.createdAt).getTime(),
-        })));
-      })
-      .catch((error) => {
-        if (active) setIrrigationError(error.message || "Could not load irrigation history.");
-      });
-    return () => {
-      active = false;
+    if (!crops.some((crop) => crop.id === taskCropId)) setTaskCropId(currentCrop?.id || "");
+  }, [crops, currentCrop?.id, taskCropId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setWeatherState({ loading: true, error: "" });
+      try {
+        const result = await fetchCurrentWeather(location.lat, location.lon);
+        if (!cancelled) setWeather(result);
+      } catch {
+        if (!cancelled) setWeatherState({ loading: false, error: "Weather data is unavailable right now." });
+      } finally {
+        if (!cancelled) setWeatherState((state) => ({ ...state, loading: false }));
+      }
     };
-  }, [currentCrop?.id]);
-
-  const healthSync = useRef(null);
-  useEffect(() => {
-    if (!currentCrop) {
-      healthSync.current = null;
-      return;
-    }
-    const previous = healthSync.current;
-    healthSync.current = { id: currentCrop.id, health: currentCrop.health };
-    if (previous?.id === currentCrop.id && previous.health !== currentCrop.health) {
-      api.updateCrop(currentCrop.id, { health: currentCrop.health }).catch(() => {});
-    }
-  }, [currentCrop?.id, currentCrop?.health]);
-
-  // Keep latest sensor values without restarting intervals
-  const tempRef = useRef(temperature);
-  const moistRef = useRef(moisture);
-  const weatherRef = useRef(weather);
+    load();
+    const intervalId = window.setInterval(load, 15 * 60 * 1000);
+    return () => { cancelled = true; window.clearInterval(intervalId); };
+  }, [location.lat, location.lon]);
 
   useEffect(() => {
-    tempRef.current = temperature;
-  }, [temperature]);
+    let cancelled = false;
+    const load = async () => {
+      setMoistureState({ loading: true, error: "" });
+      try {
+        const result = await fetchSoilMoisturePercent(location.lat, location.lon);
+        if (!cancelled) setMoisture(result);
+      } catch {
+        if (!cancelled) setMoistureState({ loading: false, error: "Soil moisture estimate is unavailable right now." });
+      } finally {
+        if (!cancelled) setMoistureState((state) => ({ ...state, loading: false }));
+      }
+    };
+    load();
+    const intervalId = window.setInterval(load, 30 * 60 * 1000);
+    return () => { cancelled = true; window.clearInterval(intervalId); };
+  }, [location.lat, location.lon]);
 
-  useEffect(() => {
-    moistRef.current = moisture;
-  }, [moisture]);
-
-  useEffect(() => {
-    weatherRef.current = weather;
-  }, [weather]);
-
-  // Use my location (reverse geocode for readable name)
   const useMyLocation = () => {
-    setWeatherError("");
-
+    setLocationMessage("");
     if (!navigator.geolocation) {
-      setWeatherError("Geolocation not supported on this browser.");
+      setLocationMessage("Location is not supported by this browser.");
       return;
     }
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-
-        setLocation({
-          label: "Locating...",
-          lat: latitude,
-          lon: longitude,
-        });
-
-        try {
-          const placeName = await reverseGeocodeLabel(latitude, longitude);
-          setLocation({ label: placeName, lat: latitude, lon: longitude });
-        } catch {
-          setLocation({ label: "My location", lat: latitude, lon: longitude });
-        }
-      },
-      () => {
-        setWeatherError("Location permission denied. Using Nairobi (default).");
-      },
-      { enableHighAccuracy: false, timeout: 8000 }
-    );
+    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+      let label = "Your location";
+      try { label = await reverseGeocodeLabel(coords.latitude, coords.longitude); } catch { /* Coordinates still work without a place label. */ }
+      setLocation({ label, lat: coords.latitude, lon: coords.longitude });
+    }, () => setLocationMessage("Location permission was not granted. Showing Nairobi weather."), { timeout: 8000 });
   };
 
-  // Fetch real weather every 15 minutes
-  useEffect(() => {
-    let cancelled = false;
+  const activeTasks = useMemo(() => tasks.filter((task) => !task.completed).sort((a, b) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999")), [tasks]);
+  const overdueCount = activeTasks.filter((task) => task.dueDate && task.dueDate < new Date().toISOString().slice(0, 10)).length;
+  const latestWatering = irrigation.find((item) => item.cropId === currentCrop?.id);
+  const cropNotes = notes.filter((item) => item.cropId === currentCrop?.id).slice(0, 3);
 
-    async function loadWeather() {
-      try {
-        setWeatherLoading(true);
-        setWeatherError("");
+  const guideVerified = currentCrop?.guide?.verificationStatus === "verified";
+  const condition = !currentCrop
+    ? { title: "Waiting for a selected crop", detail: "Choose a crop to view its available source information and field records.", tone: "quiet" }
+    : guideVerified
+      ? { title: "Guide context available", detail: "Use its crop-specific context alongside a direct field check. The regional soil estimate is not compared with crop thresholds.", tone: "quiet" }
+      : { title: "Guide needed", detail: "No verified growing guide is available for this crop yet. Shamba-Smart will not guess its growing conditions.", tone: "quiet" };
 
-        const w = await fetchCurrentWeather(location.lat, location.lon);
-        if (cancelled) return;
-
-        if (typeof w.temperature === "number") setTemperature(w.temperature);
-        if (typeof w.weather === "string") setWeather(w.weather);
-      } catch {
-        if (!cancelled) {
-          setWeatherError("Failed to load live weather. Keeping last known values.");
-        }
-      } finally {
-        if (!cancelled) setWeatherLoading(false);
-      }
-    }
-
-    loadWeather();
-    const id = setInterval(loadWeather, 1000 * 60 * 15);
-
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [location.lat, location.lon]);
-
-  // Fetch soil moisture every 30 minutes
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadMoisture() {
-      try {
-        setMoistureLoading(true);
-        setMoistureError("");
-
-        const m = await fetchSoilMoisturePercent(location.lat, location.lon);
-        if (cancelled) return;
-
-        setMoisture(m.percent);
-      } catch {
-        if (!cancelled) {
-          setMoistureError("Could not load the soil-moisture estimate. Keeping the last value.");
-        }
-      } finally {
-        if (!cancelled) setMoistureLoading(false);
-      }
-    }
-
-    loadMoisture();
-    const id = setInterval(loadMoisture, 1000 * 60 * 30);
-
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [location.lat, location.lon]);
-
-  // Interval for time passing + history snapshots
-  useEffect(() => {
-    if (paused || !currentCrop) return;
-
-    const interval = setInterval(() => {
-      setHistory((prev) => {
-        const next = [
-          {
-            t: Date.now(),
-            temperature: tempRef.current,
-            moisture: moistRef.current,
-            weather: weatherRef.current,
-          },
-          ...prev,
-        ];
-        return next.slice(0, 10);
-      });
-
-    }, tickMs);
-
-    return () => clearInterval(interval);
-  }, [currentCrop?.id, tickMs, paused]);
-
-  useEffect(() => {
-    if (paused || !currentCrop) return;
-    const interval = setInterval(() => {
-      updateCurrentCrop((crop) => ({
-        lastWateredMinutes: (crop.lastWateredMinutes ?? 0) + 1,
-      }));
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [currentCrop?.id, paused]);
-
-  // Health logic
-  useEffect(() => {
-    if (!currentCrop) return;
-    let delta = 0;
-
-    if (moisture < idealMoisture.min) delta -= 3;
-    else if (moisture > idealMoisture.max) delta -= 2;
-    else delta += 1;
-
-    if (temperature < idealTemp.min) delta -= 1;
-    else if (temperature > idealTemp.max) delta -= 2;
-    else delta += 1;
-
-    if ((weather === "Rain" || weather === "Showers") && moisture < idealMoisture.min) delta += 1;
-
-    updateCurrentCrop((c) => ({
-      health: clamp((c.health ?? 70) + delta, 0, 100),
-    }));
-  }, [
-    temperature,
-    moisture,
-    weather,
-    currentCrop?.id,
-    idealMoisture.min,
-    idealMoisture.max,
-    idealTemp.min,
-    idealTemp.max,
-  ]);
-
-  // Auto-water
-  useEffect(() => {
-    if (!currentCrop?.autoWater) return;
-
-    const trigger = idealMoisture.min - 3;
-    if (moisture < trigger) {
-      const before = moisture;
-      const after = clamp(moisture + 15, 0, 100);
-
-      setMoisture(after);
-      pushLog("Auto", before, after);
-
-      updateCurrentCrop((c) => ({
-        lastWateredMinutes: 0,
-        health: clamp((c.health ?? 70) + 4, 0, 100),
-      }));
-    }
-  }, [moisture, currentCrop?.autoWater, currentCrop?.id, idealMoisture.min]);
-
-  // Manual water
-  const waterNow = () => {
-    const before = moisture;
-    const after = clamp(moisture + 12, 0, 100);
-    setMoisture(after);
-    pushLog("Manual", before, after);
-
-    updateCurrentCrop((c) => ({
-      lastWateredMinutes: 0,
-      health: clamp((c.health ?? 70) + 3, 0, 100),
-    }));
+  const addTask = (event) => {
+    event.preventDefault();
+    if (!taskTitle.trim()) return;
+    const selected = crops.find((crop) => crop.id === taskCropId);
+    const dueDate = event.currentTarget.querySelector("#task-date")?.value || taskDue;
+    const task = journalStorage.addTask({ title: taskTitle.trim(), cropId: selected?.id || null, cropName: selected?.name || "All crops", dueDate });
+    setTasks((previous) => [task, ...previous]);
+    setTaskTitle("");
+    setTaskDue("");
   };
 
-  const toggleAutoWater = () => {
+  const toggleTask = (task) => {
+    setTasks((previous) => previous.map((item) => item.id === task.id ? { ...item, completed: !item.completed, completedAt: task.completed ? null : new Date().toISOString() } : item));
+  };
+
+  const logWatering = () => {
     if (!currentCrop) return;
-    const autoWater = !currentCrop.autoWater;
-    updateCurrentCrop({ autoWater });
-    api.updateCrop(currentCrop.id, { autoWater }).catch((error) => {
-      setIrrigationError(error.message || "Could not save the auto-water setting.");
+    const event = journalStorage.addIrrigation({ cropId: currentCrop.id, cropName: currentCrop.name, type: "Watering logged", before: moisture?.percent ?? null, after: moisture?.percent ?? null });
+    setIrrigation((previous) => [event, ...previous].slice(0, 80));
+    setCrops((previous) => previous.map((crop) => crop.id === currentCrop.id ? { ...crop, lastWateredAt: event.createdAt, lastWateredMinutes: 0 } : crop));
+  };
+
+  const planFieldCheck = () => {
+    if (!currentCrop) return;
+    const task = journalStorage.addTask({
+      title: `Check field conditions for ${currentCrop.name}`,
+      cropId: currentCrop.id,
+      cropName: currentCrop.name,
     });
+    setTasks((previous) => [task, ...previous]);
   };
 
-  // Alerts
-  const alerts = useMemo(() => {
-    let a = 0;
-    if (temperature > idealTemp.max) a++;
-    if (temperature < idealTemp.min) a++;
-    if (moisture < idealMoisture.min) a++;
-    if (moisture > idealMoisture.max) a++;
-    if ((currentCrop?.health ?? 70) < 40) a++;
-    return a;
-  }, [
-    temperature,
-    moisture,
-    currentCrop?.health,
-    idealMoisture.min,
-    idealMoisture.max,
-    idealTemp.min,
-    idealTemp.max,
-  ]);
-
-  // Trends
-  const prevTemp = history[1]?.temperature;
-  const prevMoist = history[1]?.moisture;
-  const tempTrend = trend(temperature, prevTemp);
-  const moistTrend = trend(moisture, prevMoist);
-
-  const stats = [
-    { id: 1, title: "Temperature", value: `${temperature}°C ${tempTrend}` },
-    { id: 2, title: "Estimated Moisture", value: `${moisture}% ${moistTrend}` },
-    { id: 3, title: "Weather", value: weather },
-    { id: 4, title: "Alerts", value: alerts },
-  ];
-
-  const hl = healthLabel(currentCrop?.health ?? 70);
-
-  if (!currentCrop) {
-    return (
-      <div className="dashboard">
-        <p className="page-kicker">Field overview</p>
-        <h1>Farm Dashboard</h1>
-        <div className="farm-status">
-          <h2>No crops in your journal yet</h2>
-          <p>Add a crop to begin tracking field conditions and irrigation.</p>
-        </div>
-      </div>
-    );
-  }
+  const activity = [
+    ...cropNotes.map((item) => ({ id: `note-${item.id}`, date: item.createdAt, label: `${item.category} noted`, detail: item.text, kind: "note" })),
+    ...irrigation.filter((item) => item.cropId === currentCrop?.id).slice(0, 3).map((item) => ({ id: `water-${item.id}`, date: item.createdAt, label: "Watering logged", detail: `${item.cropName} · recorded on this device`, kind: "water" })),
+  ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 4);
 
   return (
     <div className="dashboard">
-      <h1>Farm Dashboard</h1>
+      <header className="dashboard-heading">
+        <div><p className="eyebrow">FIELD JOURNAL <span> / </span> DAILY VIEW</p><h1>Good farming starts with a closer look.</h1><p>One clear view of the crop you’re tending and the work ahead.</p></div>
+        <button className="location-button" type="button" onClick={useMyLocation}><span className="location-pin" aria-hidden="true" />{location.label}<span className="location-action">Update location</span></button>
+      </header>
 
-      <div style={{ marginTop: 10, fontSize: 13, opacity: 0.85 }}>
-        <strong>Weather source:</strong> {location.label}
-        {weatherLoading ? " (loading...)" : ""}
-        {weatherError ? ` (${weatherError})` : ""}
-        <button
-          className="btn btn-outline"
-          style={{ marginLeft: 10, padding: "8px 10px" }}
-          onClick={useMyLocation}
-          type="button"
-        >
-          Use my location
-        </button>
-      </div>
+      {!currentCrop ? <section className="dashboard-empty"><span className="empty-field-lines" aria-hidden="true" /><p className="eyebrow">YOUR FIELD, YOUR RECORD</p><h2>Start with the crop in front of you.</h2><p>Add a crop, capture field tasks and make sense of available weather and regional soil information.</p><Link className="button button-primary" to="/crops">Add your first crop <span aria-hidden="true">+</span></Link></section> : <>
+        <section className="dashboard-lead">
+          <div className="lead-crop">
+            <div className="lead-topline"><span className="live-mark" /><label htmlFor="crop-switcher">SELECTED CROP</label><select id="crop-switcher" value={currentCropId} onChange={(event) => setCurrentCropId(event.target.value)} aria-label="Selected crop">{crops.map((crop) => <option key={crop.id} value={crop.id}>{crop.name}</option>)}</select></div>
+            <h2>{currentCrop.name}</h2>
+            <div className="lead-crop-meta"><span>{currentCrop.stage}</span><span>{guideVerified ? "Verified source guide" : "Guide needed"}</span></div>
+            <div className="lead-targets"><div><small>FIELD SENSOR THRESHOLD</small><strong>{currentCrop.monitoringTargets?.soilMoisture?.min != null && currentCrop.monitoringTargets?.soilMoisture?.max != null ? `${currentCrop.monitoringTargets.soilMoisture.min}–${currentCrop.monitoringTargets.soilMoisture.max}` : "Not available"}{currentCrop.monitoringTargets?.soilMoisture?.min != null && currentCrop.monitoringTargets?.soilMoisture?.max != null && <i>%</i>}</strong></div><div><small>CROP TEMPERATURE GUIDE</small><strong>{currentCrop.guide?.recommendations?.preferredDayTemperature ? `${currentCrop.guide.recommendations.preferredDayTemperature.min}–${currentCrop.guide.recommendations.preferredDayTemperature.max}` : "Not available"}{currentCrop.guide?.recommendations?.preferredDayTemperature && <i>{currentCrop.guide.recommendations.preferredDayTemperature.unit}</i>}</strong></div></div>
+            <Link to="/crops" className="lead-link">Manage crop profile</Link>
+          </div>
+          <div className="lead-condition">
+            <p className="eyebrow">FIELD CHECK</p>
+            <div className={`condition-seal ${condition.tone}`}><span className="condition-seal-inner" aria-hidden="true">{condition.tone === "good" ? "✓" : condition.tone === "attention" ? "!" : "·"}</span></div>
+            <h3>{condition.title}</h3><p>{condition.detail}</p>
+            <div className="condition-sources"><span>REGIONAL SOIL ESTIMATE</span><strong>{moistureState.loading ? "Loading" : moisture ? `${moisture.percent}%` : "Unavailable"}</strong><span>LOCAL AIR TEMPERATURE</span><strong>{weatherState.loading ? "Loading" : typeof weather?.temperature === "number" ? `${weather.temperature}°C` : "Unavailable"}</strong><span>WEATHER</span><strong>{weatherState.loading ? "Loading" : weather?.weather || "Unavailable"}</strong></div>
+          </div>
+        </section>
 
-      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.85 }}>
-        <strong>Soil moisture estimate:</strong>
-        {moistureLoading ? " loading..." : ""}
-        {moistureError ? ` (${moistureError})` : ""}
-      </div>
+        {crops.length > 1 && <section className="field-register-strip"><div className="field-register-label"><span className="eyebrow">FIELD REGISTER</span><strong>{crops.length} crops</strong></div><div className="field-register-list">{crops.map((crop) => <button key={crop.id} type="button" className={crop.id === currentCrop.id ? "plot-selected" : ""} onClick={() => setCurrentCropId(crop.id)}><span>{crop.name}</span><small>{crop.stage}</small></button>)}</div></section>}
 
-      <div className="stats-grid">
-        {stats.map((s) => (
-          <StatCard key={s.id} title={s.title} value={s.value} />
-        ))}
-      </div>
+        <div className="data-footnote"><span className="footnote-rule" />Weather from Open-Meteo for {location.label}. Soil moisture is a regional model estimate, not a field sensor reading. No threshold comparison or watering decision is based on that estimate.{weatherState.error || moistureState.error ? <span className="source-error"> {weatherState.error || moistureState.error}</span> : null}{locationMessage ? <span className="source-error"> {locationMessage}</span> : null}<button type="button" onClick={useMyLocation}>Use my location</button></div>
 
-      <div className="controls">
-        <div className="controls-left">
-          <h3>Reading History</h3>
-          <p>Choose how often the dashboard adds a local reading snapshot.</p>
-        </div>
-
-        <div className="controls-right">
-          <label>
-            Update interval
-            <select value={tickMs} onChange={(e) => setTickMs(Number(e.target.value))}>
-              <option value={3000}>3 seconds</option>
-              <option value={5000}>5 seconds</option>
-              <option value={10000}>10 seconds</option>
-            </select>
-          </label>
-
-          <button className="btn btn-outline" onClick={() => setPaused((p) => !p)} type="button">
-            {paused ? "Resume" : "Pause"}
-          </button>
-        </div>
-      </div>
-
-      <div className="farm-status">
-        <div className="farm-status-top">
-          <div>
-            <h2>Current Crop</h2>
-
-            <p>
-              <strong>Crop:</strong> {currentCrop.name}
-            </p>
-            <p>
-              <strong>Stage:</strong> {currentCrop.stage}
-            </p>
-
-            <p>
-              <strong>Profile:</strong> {profileLabel}
-            </p>
-            <p>
-              <strong>Target moisture:</strong> {idealMoisture.min}–{idealMoisture.max}%
-            </p>
-            <p>
-              <strong>Target temp:</strong> {idealTemp.min}–{idealTemp.max}°C
-            </p>
-
-            <p>
-              <strong>Health:</strong>{" "}
-              <span className={hl.cls}>
-                {hl.text} ({currentCrop.health}/100)
-              </span>
-            </p>
-
-            <p>
-              <strong>Last Watered:</strong> {currentCrop.lastWateredMinutes} minutes ago
-            </p>
+        <section className="dashboard-work">
+          <div className="work-column task-column">
+            <div className="dashboard-section-head"><div><p className="eyebrow">IN THE FIELD</p><h2>Work to do</h2></div><span className="task-count">{activeTasks.length} open <i>{overdueCount ? `· ${overdueCount} overdue` : ""}</i></span></div>
+            <form className="task-form" onSubmit={addTask}>
+              <label className="sr-only" htmlFor="task-title">New farm task</label><input id="task-title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Add a task for the field…" />
+              <label className="sr-only" htmlFor="task-crop">Crop for task</label><select id="task-crop" value={taskCropId} onChange={(event) => setTaskCropId(event.target.value)}><option value="">All crops</option>{crops.map((crop) => <option key={crop.id} value={crop.id}>{crop.name}</option>)}</select>
+              <label className="sr-only" htmlFor="task-date">Task due date</label><input id="task-date" type="date" value={taskDue} onChange={(event) => setTaskDue(event.target.value)} />
+              <button className="button button-primary" type="submit" disabled={!taskTitle.trim()} aria-label="Add farm task">Add task <span aria-hidden="true">+</span></button>
+            </form>
+            {activeTasks.length === 0 && tasks.filter((task) => task.completed).length === 0 ? <p className="task-empty">Your task list is clear. Add the next thing you want to do in the field.</p> : <div className="task-list">
+              {[...activeTasks, ...tasks.filter((task) => task.completed).slice(0, 2)].slice(0, 6).map((task) => {
+                const isOverdue = !task.completed && task.dueDate && task.dueDate < new Date().toISOString().slice(0, 10);
+                return <article className={`task-row ${task.completed ? "is-complete" : ""}`} key={task.id}><button className="task-check" type="button" aria-label={task.completed ? `Reopen ${task.title}` : `Complete ${task.title}`} onClick={() => toggleTask(task)}>{task.completed ? "✓" : ""}</button><div className="task-copy"><strong>{task.title}</strong><span>{task.cropName || "All crops"}</span></div><span className={`task-due ${isOverdue ? "is-overdue" : ""}`}>{task.completed ? "Done" : task.dueDate ? new Date(`${task.dueDate}T00:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }) : "No date"}</span><button className="task-remove" type="button" aria-label={`Delete task ${task.title}`} onClick={() => setTasks((previous) => previous.filter((item) => item.id !== task.id))}>×</button></article>;
+              })}
+            </div>}
           </div>
 
-          <div className="actions">
-            <button className="btn" onClick={waterNow} type="button">
-              Water Now
-            </button>
-
-            <button className="btn btn-outline" onClick={toggleAutoWater} type="button">
-              Auto Water: {currentCrop.autoWater ? "ON" : "OFF"}
-            </button>
-
-            <p className="hint">Auto-water triggers slightly below the crop’s target minimum.</p>
+          <div className="work-column activity-column">
+            <div className="dashboard-section-head"><div><p className="eyebrow">RECENT RECORDS</p><h2>Field activity</h2></div><Link to="/crops" className="quiet-link">Add a note</Link></div>
+            <div className="watering-summary"><div><span>Last watering logged</span><strong>{timeSince(latestWatering?.createdAt || currentCrop.lastWateredAt)}</strong></div><div className="watering-actions"><button className="button button-secondary" type="button" onClick={logWatering}>Log watering</button><button className="reminder-toggle" type="button" onClick={planFieldCheck}>Plan a field check</button></div></div>
+            <p className="activity-explainer">Field checks are added by you as tasks. Shamba-Smart does not trigger them or watering decisions from regional model percentages. Watering logs are stored on this device; no irrigation equipment is connected.</p>
+            <div className="activity-list">{activity.length ? activity.map((entry) => <article className={`activity-item ${entry.kind}`} key={entry.id}><span className="activity-marker" /><div><strong>{entry.label}</strong><p>{entry.detail}</p></div><time>{new Date(entry.date).toLocaleDateString([], { month: "short", day: "numeric" })}</time></article>) : <p className="task-empty">Notes and watering logs for {currentCrop.name} will appear here.</p>}</div>
           </div>
-        </div>
-
-        <div className="smart-notes">
-          <h3>Smart Insights</h3>
-          <ul>
-            {moisture < idealMoisture.min && (
-              <li>
-                Moisture is below target for {currentCrop.name} (min {idealMoisture.min}%).
-              </li>
-            )}
-            {moisture > idealMoisture.max && (
-              <li>
-                Moisture is above target for {currentCrop.name} (max {idealMoisture.max}%).
-              </li>
-            )}
-            {temperature > idealTemp.max && (
-              <li>
-                Temperature is too high for {currentCrop.name} (max {idealTemp.max}°C).
-              </li>
-            )}
-            {temperature < idealTemp.min && (
-              <li>
-                Temperature is too low for {currentCrop.name} (min {idealTemp.min}°C).
-              </li>
-            )}
-            {(weather === "Rain" || weather === "Showers") && <li>Rain detected. Moisture may improve.</li>}
-            {alerts === 0 && <li>Conditions look stable. Keep monitoring.</li>}
-          </ul>
-        </div>
-      </div>
-
-      {history.length > 0 && (
-        <div className="history">
-          <h3>Recent Readings</h3>
-          <div className="history-list">
-            {history.slice(0, 5).map((h) => (
-              <div className="history-item" key={h.t}>
-                <span className="history-time">
-                  {new Date(h.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </span>
-                <span className="history-val">{h.moisture}%</span>
-                <span className="history-val">{h.temperature}°C</span>
-                <span className="history-weather">{h.weather}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="irrigation">
-        <h3>Irrigation Log</h3>
-
-        {irrigationLog.length === 0 ? (
-          <p className="irrigation-empty">No irrigation events yet.</p>
-        ) : (
-          <div className="irrigation-list">
-            {irrigationLog.map((x) => (
-              <div className="irrigation-item" key={x.id}>
-                <span className="irrigation-time">
-                  {new Date(x.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </span>
-                <span className="irrigation-type">{x.type}</span>
-                <span className="irrigation-change">
-                  {x.before}% before <span aria-hidden="true">·</span> {x.after}% after
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-        {irrigationError ? <p className="irrigation-error" role="status">{irrigationError}</p> : null}
-      </div>
+        </section>
+      </>}
     </div>
   );
 }

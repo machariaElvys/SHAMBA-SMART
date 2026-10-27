@@ -1,6 +1,10 @@
-.footer {
-  background: #1b5e20;
-  color: white;
-  text-align: center;
-  padding: 1rem;
-}
+.footer { min-height: 112px; display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 22px max(24px, calc((100vw - 1220px) / 2)); background: var(--forest-deep); color: #dce2d7; }
+.footer-brand { display: flex; align-items: center; gap: 11px; }
+.footer-mark { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid rgb(217 174 84 / 70%); border-radius: 50% 50% 50% 6px; color: var(--maize); font: italic 19px Georgia, serif; }
+.footer-brand div { display: grid; }
+.footer-brand strong { font: 17px Georgia, serif; color: #f8f4e9; }
+.footer-brand span:last-child { margin-top: 4px; color: #aeb9ab; font-size: 8px; letter-spacing: .13em; }
+.footer p { margin: 0; color: #b9c3b7; font-size: 12px; }
+.footer a { color: #ebd6a0; font-size: 12px; text-decoration: none; border-bottom: 1px solid rgb(235 214 160 / 45%); }
+.footer a:hover { color: white; }
+@media (max-width: 680px) { .footer { align-items: flex-start; flex-direction: column; gap: 14px; padding: 25px 18px; } }

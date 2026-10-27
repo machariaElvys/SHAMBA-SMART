@@ -4,149 +4,15 @@ import "../styles/about.css";
 function About() {
   return (
     <div className="about-page">
-      {/* Hero */}
-      <section className="about-hero">
-        <p className="about-kicker">About</p>
+      <section className="about-intro"><div className="about-intro-copy"><p className="eyebrow">ABOUT SHAMBA-SMART <span> / </span> A FIELD JOURNAL CONCEPT</p><h1>Technology should help you pay closer attention.</h1><p>Shamba-Smart is a small crop-management project shaped around a practical idea: keep crop information, field observations and planned work where they are easy to use.</p><Link to="/dashboard" className="button button-gold">Open the field journal</Link></div><div className="about-line-art" aria-hidden="true"><span className="about-sun" /><span className="about-hill hill-one" /><span className="about-hill hill-two" /><span className="about-rows" /></div></section>
 
-        <h1 className="about-title">
-          Built from real farm experience — designed as a smart monitoring demo.
-        </h1>
+      <section className="about-story"><div className="about-side-label"><span>THE IDEA</span><i /></div><div className="about-story-main"><h2>Give good decisions a place to grow.</h2><p>Farming asks for attention to many connected things: what is planted, how it is progressing, what the soil feels like, what work is due and what changed since the last visit. A useful digital tool should make those details easier to keep in view.</p><p>This project explores that idea through a local-first crop register, a field journal and a small crop reference. It is a frontend demonstration, not a deployed farm-monitoring service.</p></div><div className="about-story-note"><span>DESIGNED AROUND</span><strong>Observation<br />Seasonality<br />Everyday work</strong></div></section>
 
-        <p className="about-subtitle">
-          Shamba-Smart started as a practical idea inspired by our farm: keeping crops healthy
-          depends on understanding conditions and making timely irrigation decisions. This project
-          turns that thinking into a clean, modern dashboard experience.
-        </p>
+      <section className="about-pillars"><div className="about-pillars-head"><p className="eyebrow">WHAT YOU CAN DO</p><h2>Tools for a more considered field visit.</h2></div><div className="about-pillar-list"><article><span>01</span><div><h3>Keep a crop register</h3><p>Save any crop, its growth stage and optional field notes without guessing growing ranges.</p></div><Link to="/crops">Crops</Link></article><article><span>02</span><div><h3>Record what you notice</h3><p>Write dated observations and connect simple tasks to your crops.</p></div><Link to="/dashboard">Field journal</Link></article><article><span>03</span><div><h3>Check a source-backed guide</h3><p>See the source, region and limitations; unavailable recommendations stay marked as unavailable.</p></div><Link to="/library">Crop library</Link></article></div></section>
 
-        <div className="about-actions">
-          <Link className="btn" to="/dashboard">Open Dashboard</Link>
-          <Link className="btn btn-outline" to="/library">Crop Library</Link>
-        </div>
-      </section>
+      <section className="about-boundaries"><div><p className="eyebrow">CLEAR ABOUT THE LIMITS</p><h2>A useful record begins with honest data.</h2></div><div><p>Weather is fetched from Open-Meteo for a selected location. Soil moisture is a regional model estimate, not a sensor reading. The dashboard does not compare it with crop targets or trigger watering decisions.</p><p>Source-backed crop context links to external agricultural resources. Shamba-Smart does not fetch their live content. Crop records, field notes and tasks are saved in this browser and are not synced to an account or server.</p></div></section>
 
-      {/* Story + Purpose */}
-      <section className="about-grid">
-        <div className="about-card">
-          <h2>The Story</h2>
-          <p>
-            I didn’t want to build “just another dashboard.” The inspiration came from the
-            day-to-day reality of farming — deciding when to water, noticing stress early,
-            and learning which crops perform best under specific conditions.
-          </p>
-          <p className="about-muted">
-            This is a prototype today, built to be expanded into a real system tomorrow.
-          </p>
-        </div>
-
-        <div className="about-card">
-          <h2>The Vision</h2>
-          <p>
-            The goal is simple: make crop monitoring understandable. A farmer should be able to
-            check conditions, see what’s changing, and take action without complicated screens.
-          </p>
-
-          <div className="about-highlight">
-            <p className="about-highlight-title">Core idea</p>
-            <p className="about-highlight-text">
-              Field conditions, irrigation records, and crop health in one monitoring journal.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* What it does */}
-      <section className="about-section">
-        <div className="about-section-head">
-          <h2>What Shamba-Smart does</h2>
-          <p className="about-muted">
-            A focused set of features that demonstrate smart-farm logic, even before real sensors are connected.
-          </p>
-        </div>
-
-        <div className="features-grid">
-          <div className="feature">
-            <h3>Crop profiles</h3>
-            <p>Each crop can have ideal moisture and temperature targets.</p>
-          </div>
-          <div className="feature">
-            <h3>Current conditions</h3>
-            <p>Weather and modeled soil-moisture estimates refresh periodically for the selected location.</p>
-          </div>
-          <div className="feature">
-            <h3>Manual irrigation</h3>
-            <p>“Water Now” records the action in your account and updates the crop model.</p>
-          </div>
-          <div className="feature">
-            <h3>Auto-water logic</h3>
-            <p>Demonstrates automatic irrigation when moisture drops below a safe level.</p>
-          </div>
-          <div className="feature">
-            <h3>Insights & alerts</h3>
-            <p>Simple explanations when conditions drift outside crop targets.</p>
-          </div>
-          <div className="feature">
-            <h3>Crop Library</h3>
-            <p>A built-in crop dictionary to guide decisions and educate farmers.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Tech + Roadmap */}
-      <section className="about-grid">
-        <div className="about-card">
-          <h2>Tech Stack</h2>
-          <ul className="about-list">
-            <li><strong>React</strong> — component-based UI</li>
-            <li><strong>React Router</strong> — navigation</li>
-            <li><strong>Flask and SQLAlchemy</strong> — account-aware API and database</li>
-            <li><strong>CSS</strong> — field-journal inspired responsive styling</li>
-          </ul>
-          <p className="about-muted">
-            The structure is kept simple on purpose so it’s easy to expand later.
-          </p>
-        </div>
-
-        <div className="about-card">
-          <h2>Roadmap</h2>
-          <ul className="about-list">
-            <li>Replace simulated temperature/weather with real weather data (API)</li>
-            <li>Improve moisture realism (rain + evaporation model)</li>
-            <li>IoT phase: connect soil sensors and irrigation control hardware</li>
-            <li>Data storage + farm reports (watering history, yield notes)</li>
-          </ul>
-        </div>
-      </section>
-
-      {/* Personal footer */}
-      <section className="about-footer">
-        <div className="about-footer-inner">
-          <div>
-            <h2 className="about-footer-title">Made  for real farmers</h2>
-            <p className="about-muted">
-              This project is personal: it’s inspired by our farm and built as a professional portfolio piece
-              with real-world direction.
-            </p>
-          </div>
-
-          <div className="about-footer-actions">
-            
-            <a 
-            className="btn btn-outline"
-             href="https://github.com/machariaElvys"
-             target= "_blank"
-             rel="noopener noreferrer"
-             
-             >
-              GitHub 
-            </a>
-            <a
-             className="btn" href="mailto:machariaelvys@gmail.com">
-             
-              Email
-            </a>
-          </div>
-        </div>
-      </section>
+      <footer className="about-footer"><p>Built as a practical exploration of crop management and clear farm interfaces.</p><div><a href="https://github.com/machariaElvys" target="_blank" rel="noopener noreferrer">GitHub profile</a><a href="mailto:machariaelvys@gmail.com">Contact</a></div></footer>
     </div>
   );
 }

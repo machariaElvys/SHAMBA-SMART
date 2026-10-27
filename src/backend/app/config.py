@@ -10,19 +10,11 @@ load_dotenv(BACKEND_DIR / ".env")
 
 
 class Config:
-    BACKEND_DIR = BACKEND_DIR
-    INSTANCE_DIR = BACKEND_DIR / "instance"
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL",
-        f"sqlite:///{(INSTANCE_DIR / 'shamba_smart.db').as_posix()}",
-    )
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-in-production")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=1)
 
-    _cors_raw = os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173",
-    )
-    CORS_ORIGINS = [origin.strip() for origin in _cors_raw.split(",") if origin.strip()]
+    _cors_raw = os.getenv("CORS_ORIGINS", "")
+    CORS_ORIGINS = [x.strip() for x in _cors_raw.split(",") if x.strip()]

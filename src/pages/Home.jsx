@@ -1,164 +1,39 @@
 import { Link } from "react-router-dom";
 import "../styles/home.css";
 
-function Home({ user }) {
+function Home({ crops = [], currentCrop }) {
   return (
-    <div className="home">
-      {/* HERO */}
+    <div className="home-page">
       <section className="home-hero">
-        <div className="home-hero-content">
-          <p className="home-kicker">Shamba-Smart</p>
-
-          <h1 className="home-title">
-            Smart crop monitoring, <span className="home-title-accent">simplified</span>.
-          </h1>
-
-          <p className="home-subtitle">
-            Track crop profiles and watering actions alongside local weather and modeled soil readings, with clear notes about what the data represents.
-          </p>
-
-          <div className="home-cta">
-            {user ? (
-              <>
-                <Link className="btn" to="/dashboard">Open dashboard</Link>
-                <Link className="btn btn-outline" to="/crops">Manage crops</Link>
-              </>
-            ) : (
-              <>
-                <Link className="btn" to="/register">Create your account</Link>
-                <Link className="btn btn-outline" to="/login">Sign in</Link>
-              </>
-            )}
-          </div>
-
-          <div className="home-proof">
-            <span className="pill">Responsive UI</span>
-            <span className="pill">Crop Profiles</span>
-            <span className="pill">Auto / Manual Watering</span>
-            <span className="pill">Smart Insights</span>
-          </div>
+        <div className="home-copy">
+          <p className="eyebrow home-eyebrow"><span className="eyebrow-stitch" /> MADE FOR THE RHYTHM OF THE SHAMBA</p>
+          <h1>Know your crops.<br /><em>Tend your field.</em></h1>
+          <p className="home-intro">A thoughtful field journal for tracking what you grow, noting what you see and planning the work ahead.</p>
+          <div className="home-actions"><Link to="/dashboard" className="button button-gold">Open field journal</Link><Link to="/crops" className="home-text-link">Manage your crops</Link></div>
+          <div className="home-local-note"><span className="home-note-mark" aria-hidden="true" /><p>Your crop records stay on this device.<br /><strong>No account or backend needed.</strong></p></div>
         </div>
+        <figure className="home-landscape">
+          <img src="/shamba-field.svg" alt="Illustration of cultivated field rows beneath the morning sun and highland hills" />
+          <figcaption><span>FIELD NOTES, FOR REAL GROWING</span><span>01 / EVERY SEASON</span></figcaption>
+          <div className="landscape-label"><small>YOUR FIELD TODAY</small><strong>{currentCrop ? currentCrop.name : "A fresh start"}</strong><span>{crops.length ? `${crops.length} ${crops.length === 1 ? "crop" : "crops"} in your register` : "Ready when you are"}</span></div>
+        </figure>
+      </section>
 
-        <div className="home-hero-panel">
-          <div className="panel-card">
-            <p className="panel-kicker">Example field snapshot</p>
-            <div className="panel-row">
-              <span className="panel-label">Current Crop</span>
-              <span className="panel-value">Maize</span>
-            </div>
-            <div className="panel-row">
-              <span className="panel-label">Soil Moisture</span>
-              <span className="panel-value">64%</span>
-            </div>
-            <div className="panel-row">
-              <span className="panel-label">Temperature</span>
-              <span className="panel-value">29°C</span>
-            </div>
-            <div className="panel-row">
-              <span className="panel-label">Irrigation</span>
-              <span className="panel-value">Auto: OFF</span>
-            </div>
-
-            <div className="panel-divider" />
-
-            <p className="panel-note">
-              This dashboard models how environmental conditions affect crop health and irrigation decisions.
-            </p>
-          </div>
+      <section className="home-principles">
+        <p className="eyebrow">A LITTLE MORE CLARITY, EACH DAY</p>
+        <div className="principle-grid">
+          <article><span className="principle-index">01</span><h2>Keep a close record</h2><p>Track crops by name, growing stage and the conditions you want to maintain.</p></article>
+          <article><span className="principle-index">02</span><h2>Notice what changes</h2><p>Record field observations and keep a clear history of watering and farm work.</p></article>
+          <article><span className="principle-index">03</span><h2>Plan the next visit</h2><p>Make a simple task list so the work you mean to do is easy to find again.</p></article>
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section className="home-section">
-        <div className="section-head">
-          <h2 className="section-title">What you can do</h2>
-          <p className="section-subtitle">
-            Practical tools for monitoring crops and making irrigation decisions — without noise.
-          </p>
-        </div>
-
-        <div className="feature-grid">
-          <div className="feature-card">
-            <h3>Monitor conditions</h3>
-            <p>View moisture, temperature and weather signals in a clean dashboard layout.</p>
-          </div>
-
-          <div className="feature-card">
-            <h3>Crop profiles</h3>
-            <p>Use recommended ranges for common crops or customize your own thresholds.</p>
-          </div>
-
-          <div className="feature-card">
-            <h3>Irrigation tracking</h3>
-            <p>Log manual watering events or use auto-water based on crop moisture targets.</p>
-          </div>
-
-          <div className="feature-card">
-            <h3>Smart insights</h3>
-            <p>Get simple explanations when conditions drift outside the target range.</p>
-          </div>
-        </div>
+      <section className="home-journal-callout">
+        <div className="callout-rule" />
+        <div><p className="eyebrow">YOUR FIELD JOURNAL</p><h2>Start with what you’re growing now.</h2><p>Add any crop by name. Source-backed recommendations appear when available; missing values stay clear.</p></div>
+        <Link to="/crops" className="button button-outline-light">Build your field list</Link>
       </section>
-
-      {/* HOW IT WORKS */}
-      <section className="home-section home-how">
-        <div className="section-head">
-          <h2 className="section-title">How it works</h2>
-          <p className="section-subtitle">
-            A simple model: environment affects crop health, irrigation helps recovery.
-          </p>
-        </div>
-
-        <div className="how-grid">
-          <div className="how-step">
-            <p className="how-number">01</p>
-            <h3>Environment</h3>
-            <p>Weather and modeled moisture refresh periodically; reading snapshots build over time.</p>
-          </div>
-
-          <div className="how-step">
-            <p className="how-number">02</p>
-            <h3>Crop response</h3>
-            <p>Health adjusts based on your crop’s ideal moisture and temperature ranges.</p>
-          </div>
-
-          <div className="how-step">
-            <p className="how-number">03</p>
-            <h3>Decision support</h3>
-            <p>Alerts and insights indicate stress, and irrigation actions improve conditions.</p>
-          </div>
-        </div>
-
-        <div className="field-note">
-          <span className="field-note-label">Field note</span>
-          <p>Readings, crop targets, and watering history stay together in one account.</p>
-        </div>
-      </section>
-
-      {/* CTA FOOT */}
-      <section className="home-cta-foot">
-        <div className="cta-foot-inner">
-          <div>
-            <h2 className="cta-foot-title">Ready to monitor your farm?</h2>
-            <p className="cta-foot-subtitle">
-              Save your crop profiles, review environmental readings, and keep a history of irrigation actions.
-            </p>
-          </div>
-          <div className="cta-foot-actions">
-            {user ? (
-              <>
-                <Link className="btn" to="/crops">Add crops</Link>
-                <Link className="btn btn-outline" to="/dashboard">View dashboard</Link>
-              </>
-            ) : (
-              <>
-                <Link className="btn" to="/register">Create account</Link>
-                <Link className="btn btn-outline" to="/login">Sign in</Link>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
+      <section className="home-library-link"><div><p className="eyebrow">A PRACTICAL REFERENCE</p><h2>Good questions grow good crops.</h2></div><p>Look up source-backed crop context, see its limits and find Kenyan agricultural references for crops still needing a guide.</p><Link to="/library" className="home-text-link">Browse the crop library</Link></section>
     </div>
   );
 }

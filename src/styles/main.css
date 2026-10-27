@@ -1,31 +1,70 @@
-/* Global reset */
-* {
-  box-sizing: border-box;
+:root {
+  font-family: "Aptos", "Segoe UI", Arial, sans-serif;
+  color: #202c24;
+  background: #f5f3eb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --forest: #173d2c;
+  --forest-deep: #102e22;
+  --leaf: #657d42;
+  --leaf-bright: #94a85b;
+  --maize: #d9ae54;
+  --soil: #8a5d43;
+  --paper: #f5f3eb;
+  --paper-light: #fcfbf6;
+  --sage: #e7e9dd;
+  --muted: #687169;
+  --ink: #202c24;
+  --line: #d8d9ce;
+  --danger: #9e4937;
+  --radius-sm: 4px;
+  --radius-md: 9px;
+  --shadow-soft: 0 14px 40px rgb(26 42 31 / 8%);
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 40px;
+  --space-5: 64px;
+  --ease: 180ms ease;
 }
 
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f4fff6;
-  color: #222;
-}
+* { box-sizing: border-box; }
+html { min-width: 320px; scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; background: var(--paper); color: var(--ink); font-size: 15px; line-height: 1.55; }
+button, input, select, textarea { font: inherit; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button { color: inherit; }
+a { color: inherit; }
+main { min-height: calc(100vh - 150px); padding: 0 24px 88px; }
+.container { width: min(100%, 1220px); margin: 0 auto; }
+h1, h2, h3, p, figure { margin-top: 0; }
+h1, h2, h3 { text-wrap: balance; }
+h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -.035em; }
+h1 { font-size: clamp(2.65rem, 5vw, 4.8rem); line-height: .99; }
+h2 { font-size: clamp(1.8rem, 3vw, 2.8rem); line-height: 1.08; }
+p { text-wrap: pretty; }
+.eyebrow { margin: 0 0 15px; color: var(--leaf); font-size: 10px; line-height: 1.4; font-weight: 800; letter-spacing: .15em; }
+.eyebrow span { margin: 0 5px; color: var(--maize); }
+.page-intro { max-width: 590px; color: #58635b; font-size: 16px; line-height: 1.7; }
+.button { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 11px 18px; border: 1px solid transparent; border-radius: var(--radius-sm); text-decoration: none; font-weight: 700; font-size: 13px; cursor: pointer; transition: background var(--ease), color var(--ease), border-color var(--ease), transform var(--ease); }
+.button:hover:not(:disabled) { transform: translateY(-1px); }
+.button:focus-visible, a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgb(217 174 84 / 75%); outline-offset: 3px; }
+.button:disabled { opacity: .45; cursor: not-allowed; }
+.button-primary { background: var(--forest); color: white; }
+.button-primary:hover:not(:disabled) { background: var(--forest-deep); }
+.button-secondary { background: transparent; border-color: #aab2a7; color: var(--forest); }
+.button-secondary:hover:not(:disabled) { background: #edf0e7; border-color: var(--forest); }
+.button-danger { background: var(--danger); color: white; }
+.field { display: grid; gap: 7px; min-width: 0; color: #525d54; font-size: 11px; font-weight: 800; letter-spacing: .045em; }
+.field input, .field select, .field textarea, .task-form input, .task-form select { width: 100%; min-width: 0; min-height: 46px; padding: 11px 12px; border: 1px solid #cbd0c4; border-radius: 3px; background: #fffefa; color: var(--ink); font-size: 14px; letter-spacing: 0; }
+.field textarea { min-height: 110px; resize: vertical; }
+.field input::placeholder, .field textarea::placeholder, .task-form input::placeholder { color: #8a918a; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-/* Consistent page spacing */
-main {
-  min-height: 80vh;
-  padding: 28px 18px;
+@media (max-width: 640px) {
+  main { padding: 0 15px 56px; }
+  h1 { font-size: clamp(2.45rem, 12vw, 3.6rem); }
 }
-
-/* Premium centered container */
-.container {
-  width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
-}
-
-/* Mobile spacing */
-@media (max-width: 768px) {
-  main {
-    padding: 18px 14px;
-  }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

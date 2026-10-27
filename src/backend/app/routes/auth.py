@@ -22,10 +22,8 @@ def _read_credentials():
     if not isinstance(data, dict):
         data = {}
 
-    raw_email = data.get("email")
-    raw_password = data.get("password")
-    email = raw_email.strip().lower() if isinstance(raw_email, str) else ""
-    password = raw_password if isinstance(raw_password, str) else ""
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
     return email, password
 
 
@@ -36,15 +34,11 @@ def register():
     if not email or not password:
         return jsonify({"error": "email and password are required"}), 400
 
-    if email.count("@") != 1 or any(character.isspace() for character in email):
+    if "@" not in email:
         return jsonify({"error": "enter a valid email"}), 400
-    if len(email) > 120:
-        return jsonify({"error": "email must be 120 characters or fewer"}), 400
 
-    if len(password) < 8:
-        return jsonify({"error": "password must be at least 8 characters"}), 400
-    if len(password) > 256:
-        return jsonify({"error": "password must be 256 characters or fewer"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "password must be at least 6 characters"}), 400
 
     existing = User.query.filter_by(email=email).first()
     if existing:
@@ -74,8 +68,6 @@ def login():
 
     if not email or not password:
         return jsonify({"error": "email and password are required"}), 400
-    if len(password) > 256:
-        return jsonify({"error": "password must be 256 characters or fewer"}), 400
 
     user = User.query.filter_by(email=email).first()
 
@@ -94,7 +86,6 @@ def login():
 
 
 @bp.get("/api/auth/me")
-@jwt_required()
 def me():
     user_id = get_jwt_identity()
     user = db.session.get(User, int(user_id)) if user_id is not None else None
