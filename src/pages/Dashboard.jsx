@@ -18,6 +18,13 @@ function timeSince(dateValue) {
   return `${Math.floor(hours / 24)} days ago`;
 }
 
+function completeRange(range) {
+  return Boolean(range && Number.isFinite(range.min) && Number.isFinite(range.max) && range.min < range.max);
+}
+
+function formatRange(range, fallbackUnit = "") {
+  return completeRange(range) ? range.min + "–" + range.max + (range.unit || fallbackUnit) : "Not available";
+}
 function Dashboard({ crops, currentCrop, currentCropId, setCurrentCropId, setCrops, notes, tasks, setTasks, irrigation, setIrrigation }) {
   const [location, setLocation] = useState(DEFAULT_LOCATION);
   const [weather, setWeather] = useState(null);
@@ -88,11 +95,26 @@ function Dashboard({ crops, currentCrop, currentCropId, setCurrentCropId, setCro
   const cropNotes = notes.filter((item) => item.cropId === currentCrop?.id).slice(0, 3);
 
   const guideVerified = currentCrop?.guide?.verificationStatus === "verified";
+  const temperatureGuidance = currentCrop?.growingGuidance?.ranges?.temperature
+    || currentCrop?.guide?.recommendations?.preferredDayTemperature;
+  const sensorMoistureGuidance = currentCrop?.growingGuidance?.ranges?.soilMoistureSensor
+    || currentCrop?.guide?.recommendations?.soilMoistureSensorRange;
+  const farmerMoistureRange = currentCrop?.monitoringTargets?.soilMoisture;
+  const farmerTemperatureRange = currentCrop?.monitoringTargets?.temperature;
+  const temperatureWasExternallyRetrieved = temperatureGuidance?.confidence === "externally-retrieved-unverified"
+    || temperatureGuidance?.verificationStatus === "unverified";
+  const displayedTemperatureRange = temperatureGuidance || farmerTemperatureRange;
   const condition = !currentCrop
     ? { title: "Waiting for a selected crop", detail: "Choose a crop to view its available source information and field records.", tone: "quiet" }
-    : guideVerified
-      ? { title: "Guide context available", detail: "Use its crop-specific context alongside a direct field check. The regional soil estimate is not compared with crop thresholds.", tone: "quiet" }
-      : { title: "Guide needed", detail: "No verified growing guide is available for this crop yet. Shamba-Smart will not guess its growing conditions.", tone: "quiet" };
+    : temperatureWasExternallyRetrieved
+      ? { title: "External temperature reference", detail: "This range is unverified and has not been reviewed by an expert. The regional soil estimate is not compared with it.", tone: "quiet" }
+      : guideVerified && completeRange(temperatureGuidance)
+        ? { title: "Guide context available", detail: "Use its crop-specific context alongside a direct field check. The regional soil estimate is not compared with crop thresholds.", tone: "quiet" }
+        : completeRange(temperatureGuidance)
+          ? { title: "Temperature reference available", detail: "Use the saved source details to review this range. It does not provide a soil-moisture sensor threshold.", tone: "quiet" }
+          : completeRange(farmerTemperatureRange) || completeRange(farmerMoistureRange)
+            ? { title: "Your field ranges are saved", detail: "These are farmer-entered comparison values. The regional soil estimate is not compared with them.", tone: "quiet" }
+            : { title: "Growing ranges incomplete", detail: "No supported temperature range is available yet. Missing ranges stay blank; regional estimates do not trigger crop alerts or watering advice.", tone: "quiet" };
 
   const addTask = (event) => {
     event.preventDefault();
@@ -144,7 +166,7 @@ function Dashboard({ crops, currentCrop, currentCropId, setCurrentCropId, setCro
             <div className="lead-topline"><span className="live-mark" /><label htmlFor="crop-switcher">SELECTED CROP</label><select id="crop-switcher" value={currentCropId} onChange={(event) => setCurrentCropId(event.target.value)} aria-label="Selected crop">{crops.map((crop) => <option key={crop.id} value={crop.id}>{crop.name}</option>)}</select></div>
             <h2>{currentCrop.name}</h2>
             <div className="lead-crop-meta"><span>{currentCrop.stage}</span><span>{guideVerified ? "Verified source guide" : "Guide needed"}</span></div>
-            <div className="lead-targets"><div><small>FIELD SENSOR THRESHOLD</small><strong>{currentCrop.monitoringTargets?.soilMoisture?.min != null && currentCrop.monitoringTargets?.soilMoisture?.max != null ? `${currentCrop.monitoringTargets.soilMoisture.min}–${currentCrop.monitoringTargets.soilMoisture.max}` : "Not available"}{currentCrop.monitoringTargets?.soilMoisture?.min != null && currentCrop.monitoringTargets?.soilMoisture?.max != null && <i>%</i>}</strong></div><div><small>CROP TEMPERATURE GUIDE</small><strong>{currentCrop.guide?.recommendations?.preferredDayTemperature ? `${currentCrop.guide.recommendations.preferredDayTemperature.min}–${currentCrop.guide.recommendations.preferredDayTemperature.max}` : "Not available"}{currentCrop.guide?.recommendations?.preferredDayTemperature && <i>{currentCrop.guide.recommendations.preferredDayTemperature.unit}</i>}</strong></div></div>
+<div className="lead-targets"><div><small>{sensorMoistureGuidance?.confidence === "externally-retrieved-unverified" ? "SENSOR RANGE · UNVERIFIED SOURCE" : completeRange(sensorMoistureGuidance) ? "SOURCE SENSOR RANGE" : "YOUR SENSOR RANGE"}</small><strong>{formatRange(sensorMoistureGuidance || farmerMoistureRange, "%")}</strong>{completeRange(sensorMoistureGuidance) && completeRange(farmerMoistureRange) && <small className="dashboard-saved-range">Your range: {formatRange(farmerMoistureRange, "%")}</small>}</div><div><small>{temperatureWasExternallyRetrieved ? "TEMPERATURE · UNVERIFIED SOURCE" : completeRange(temperatureGuidance) ? guideVerified ? "VERIFIED CROP GUIDANCE" : "CROP TEMPERATURE GUIDANCE" : "YOUR TEMPERATURE RANGE"}</small><strong>{formatRange(displayedTemperatureRange, "°C")}</strong>{completeRange(temperatureGuidance) && completeRange(farmerTemperatureRange) && <small className="dashboard-saved-range">Your range: {formatRange(farmerTemperatureRange, "°C")}</small>}</div></div>
             <Link to="/crops" className="lead-link">Manage crop profile</Link>
           </div>
           <div className="lead-condition">

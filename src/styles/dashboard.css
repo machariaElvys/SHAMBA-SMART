@@ -139,3 +139,5 @@
   .field-register-list button:first-child { padding-left: 0; border-left: 0; }
   .dashboard-empty { min-height: 370px; padding: 25px; }
 }
+
+.lead-targets .dashboard-saved-range { color: #c7d0c1; font-size: 9px; font-weight: 550; letter-spacing: 0; }

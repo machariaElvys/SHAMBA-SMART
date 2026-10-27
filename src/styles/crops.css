@@ -163,4 +163,77 @@
 .crop-saved-reference p { margin: 0; color: #586458; font-size: 10px; line-height: 1.6; }
 .crop-saved-reference > div:last-child { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin-top: 10px; padding-top: 8px; border-top: 1px solid #e0e2d9; color: #7b8379; font-size: 8px; }
 .crop-saved-reference a { color: #456148; font-weight: 750; text-underline-offset: 3px; }
+.crop-wiki-search { display: grid; gap: 12px; margin: 14px 0 0 66px; padding: 15px 16px; border: 1px solid #d6dbd0; background: rgb(250 249 243 / 82%); }
+.crop-wiki-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.crop-wiki-kicker, .crop-wiki-subject small, .crop-wiki-source-label { color: #7c765e; font-size: 8px; font-weight: 850; letter-spacing: .12em; }
+.crop-wiki-heading h4 { margin: 4px 0 3px; color: var(--forest); font: 20px Georgia, serif; }
+.crop-wiki-heading p { margin: 0; color: #70796e; font-size: 10px; line-height: 1.5; }
+.crop-wiki-subject { display: grid; gap: 4px; min-width: 110px; padding: 8px 10px; border-left: 2px solid #b9a369; background: #eeede3; }
+.crop-wiki-subject strong { color: #405248; font: 15px Georgia, serif; }
+.crop-wiki-form { display: grid; grid-template-columns: minmax(180px, 1fr) auto; align-items: end; gap: 11px; }
+.crop-wiki-form .field { font-size: 9px; }
+.crop-wiki-form .field select { min-height: 38px; padding-block: 7px; font-size: 11px; }
+.crop-wiki-form .button { min-height: 38px; padding: 8px 14px; font-size: 10px; }
+.crop-wiki-disclaimer { margin: 0; color: #7b8176; font-size: 9px; line-height: 1.55; }
+.crop-wiki-results:empty { display: none; }
+.crop-wiki-state { display: grid; gap: 9px; margin: 0; padding: 12px; border-left: 2px solid #b9a369; background: #eeede3; color: #586458; font-size: 10px; line-height: 1.6; }
+.crop-wiki-state p { margin: 0; }
+.crop-wiki-state.is-error { border-left-color: #a75a4d; }
+.crop-wiki-result-list { display: grid; gap: 8px; }
+.crop-wiki-result { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 12px; border: 1px solid #d8ddd2; background: #f5f4ec; }
+.crop-wiki-result h5 { margin: 5px 0; color: var(--forest); font: 17px/1.25 Georgia, serif; }
+.crop-wiki-result-copy p { margin: 0; color: #586458; font-size: 10px; line-height: 1.6; overflow-wrap: anywhere; }
+.crop-wiki-result-actions { display: grid; justify-items: start; gap: 8px; min-width: 150px; }
+.crop-wiki-result-actions a, .crop-wiki-result-actions .text-button { color: #456148; font-size: 9px; font-weight: 750; text-underline-offset: 3px; }
+.crop-wiki-result-actions .text-button { text-align: left; }
+.reference-preview-dialog h3 { margin: 0 0 9px; color: var(--forest); font: 21px/1.25 Georgia, serif; }
+.reference-preview-dialog .reference-preview-link { display: inline-block; width: fit-content; color: #456148; font-size: 11px; font-weight: 750; text-underline-offset: 3px; }
+.reference-preview-dialog .reference-preview-date, .reference-preview-dialog .reference-preview-note { margin: 10px 0 0; font-size: 10px; line-height: 1.5; }
+.reference-preview-dialog .reference-preview-note { padding-top: 10px; border-top: 1px solid #d8ddd2; }
+@media (max-width: 900px) {
+  .crop-wiki-search { margin-left: 66px; }
+}
+@media (max-width: 620px) {
+  .crop-wiki-search { margin: 12px 0 0; padding: 12px; }
+  .crop-wiki-heading { display: grid; }
+  .crop-wiki-subject { min-width: 0; }
+  .crop-wiki-form { grid-template-columns: 1fr; }
+  .crop-wiki-form .button { width: 100%; }
+  .crop-wiki-result { grid-template-columns: 1fr; }
+  .crop-wiki-result-actions { display: flex; flex-wrap: wrap; gap: 8px 14px; min-width: 0; }
+  .reference-preview-dialog { max-height: calc(100vh - 36px); overflow-y: auto; padding: 21px; }
+  .reference-preview-dialog .dialog-actions { grid-template-columns: 1fr 1fr; }
+}
+.crop-form-actions { grid-column: 3; display: grid; gap: 8px; }
+.crop-form-actions .button { width: 100%; min-width: 205px; }
+.growing-range-detail { display: grid; gap: 6px; margin: 13px 0 0 66px; padding: 12px 14px; border-left: 2px solid #82906d; background: #e9ece2; color: #637062; font-size: 10px; line-height: 1.55; }
+.growing-range-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.growing-range-heading strong { color: #405744; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; }
+.growing-range-heading time { color: #7b8378; font-size: 9px; }
+.growing-range-detail p { margin: 0; }
+.growing-range-detail p > span { color: #3f5444; font-weight: 750; }
+.growing-range-evidence { margin: 1px 0 2px; padding-left: 10px; border-left: 1px solid #b6c1ae; color: #748071; font-size: 9px; font-style: italic; }
+.growing-range-message.is-error { color: #8c443a; }
+.growing-range-sources { display: grid; gap: 3px; margin-top: 3px; padding-top: 7px; border-top: 1px solid #d2d9ce; }
+.growing-range-sources a { color: #48634b; font-weight: 750; text-underline-offset: 2px; }
+.crop-row-actions .growing-range-button { min-height: 36px; }
 
+@media (max-width: 900px) {
+  .crop-form-actions { grid-column: 3; }
+  .growing-range-detail { margin-left: 66px; }
+}
+
+@media (max-width: 620px) {
+  .crop-form-actions { grid-column: 1; }
+  .crop-form-actions .button { min-width: 0; }
+  .growing-range-detail { margin: 12px 0 0; }
+  .growing-range-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
+}
+
+.crop-profile-summary .saved-farmer-range, .crop-profile-line .saved-farmer-range { color: #718071; font-size: 9px; font-weight: 600; line-height: 1.45; }
+.growing-range-conflicts { margin-top: 3px; padding: 8px 10px; border-left: 2px solid #b47e47; background: #f4eadb; color: #705c46; }
+.growing-range-conflicts > strong { display: block; color: #735638; font-size: 9px; }
+.growing-range-conflicts ul { display: grid; gap: 8px; margin: 6px 0 0; padding-left: 16px; }
+.growing-range-conflicts li { padding-left: 2px; }
+.growing-range-conflicts a { color: #48634b; font-weight: 750; text-underline-offset: 2px; }
+.growing-range-conflicts blockquote { margin: 4px 0 0; color: #7a6c5c; font-size: 9px; font-style: italic; }
