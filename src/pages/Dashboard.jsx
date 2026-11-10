@@ -5,6 +5,7 @@ import { fetchCurrentWeather } from "../services/weather";
 import { reverseGeocodeLabel } from "../services/geocode";
 import { fetchSoilMoisturePercent } from "../services/soilMoisture";
 import { journalStorage } from "../services/journalStorage";
+import { findCropGuide } from "../data/cropGuides";
 
 const DEFAULT_LOCATION = { label: "Nairobi, Kenya", lat: -1.286389, lon: 36.817223 };
 
@@ -94,16 +95,21 @@ function Dashboard({ crops, currentCrop, currentCropId, setCurrentCropId, setCro
   const latestWatering = irrigation.find((item) => item.cropId === currentCrop?.id);
   const cropNotes = notes.filter((item) => item.cropId === currentCrop?.id).slice(0, 3);
 
-  const guideVerified = currentCrop?.guide?.verificationStatus === "verified";
+  const localCropGuide = currentCrop ? findCropGuide(currentCrop.guide?.key || currentCrop.guideKey || currentCrop.name) : null;
+  const guideVerified = currentCrop?.guide?.verificationStatus === "verified" || localCropGuide?.verificationStatus === "verified";
   const temperatureGuidance = currentCrop?.growingGuidance?.ranges?.temperature
-    || currentCrop?.guide?.recommendations?.preferredDayTemperature;
+    || currentCrop?.guide?.recommendations?.preferredDayTemperature
+    || localCropGuide?.recommendations?.preferredDayTemperature;
   const sensorMoistureGuidance = currentCrop?.growingGuidance?.ranges?.soilMoistureSensor
-    || currentCrop?.guide?.recommendations?.soilMoistureSensorRange;
+    || currentCrop?.guide?.recommendations?.soilMoistureSensorRange
+    || localCropGuide?.recommendations?.soilMoistureSensorRange;
   const farmerMoistureRange = currentCrop?.monitoringTargets?.soilMoisture;
   const farmerTemperatureRange = currentCrop?.monitoringTargets?.temperature;
   const temperatureWasExternallyRetrieved = temperatureGuidance?.confidence === "externally-retrieved-unverified"
     || temperatureGuidance?.verificationStatus === "unverified";
   const displayedTemperatureRange = temperatureGuidance || farmerTemperatureRange;
+  const rangesIncomplete = !completeRange(temperatureGuidance || farmerTemperatureRange)
+    || !completeRange(sensorMoistureGuidance || farmerMoistureRange);
   const condition = !currentCrop
     ? { title: "Waiting for a selected crop", detail: "Choose a crop to view its available source information and field records.", tone: "quiet" }
     : temperatureWasExternallyRetrieved
@@ -167,7 +173,7 @@ function Dashboard({ crops, currentCrop, currentCropId, setCurrentCropId, setCro
             <h2>{currentCrop.name}</h2>
             <div className="lead-crop-meta"><span>{currentCrop.stage}</span><span>{guideVerified ? "Verified source guide" : "Guide needed"}</span></div>
 <div className="lead-targets"><div><small>{sensorMoistureGuidance?.confidence === "externally-retrieved-unverified" ? "SENSOR RANGE · UNVERIFIED SOURCE" : completeRange(sensorMoistureGuidance) ? "SOURCE SENSOR RANGE" : "YOUR SENSOR RANGE"}</small><strong>{formatRange(sensorMoistureGuidance || farmerMoistureRange, "%")}</strong>{completeRange(sensorMoistureGuidance) && completeRange(farmerMoistureRange) && <small className="dashboard-saved-range">Your range: {formatRange(farmerMoistureRange, "%")}</small>}</div><div><small>{temperatureWasExternallyRetrieved ? "TEMPERATURE · UNVERIFIED SOURCE" : completeRange(temperatureGuidance) ? guideVerified ? "VERIFIED CROP GUIDANCE" : "CROP TEMPERATURE GUIDANCE" : "YOUR TEMPERATURE RANGE"}</small><strong>{formatRange(displayedTemperatureRange, "°C")}</strong>{completeRange(temperatureGuidance) && completeRange(farmerTemperatureRange) && <small className="dashboard-saved-range">Your range: {formatRange(farmerTemperatureRange, "°C")}</small>}</div></div>
-            <Link to="/crops" className="lead-link">Manage crop profile</Link>
+            {rangesIncomplete ? <Link to={"/crops?lookup=" + encodeURIComponent(currentCrop.id)} className="lead-link">Find &amp; apply growing ranges</Link> : <Link to="/crops" className="lead-link">Manage crop profile</Link>}
           </div>
           <div className="lead-condition">
             <p className="eyebrow">FIELD CHECK</p>

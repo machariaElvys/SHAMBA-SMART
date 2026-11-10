@@ -32,12 +32,9 @@
 .library-row-number { color: #989e94; font-size: 9px; text-align: right; }
 .library-row-status { color: #8a7656; font-size: 7px; font-weight: 850; letter-spacing: .08em; text-align: right; text-transform: uppercase; }
 .library-row-status.verified { color: #4d6b4d; }
-.library-source-note { margin: 16px 0 0; padding-left: 11px; border-left: 1px solid var(--maize); color: #7a8379; font-size: 9px; line-height: 1.65; }
 .library-no-results { padding: 25px 3px; }
 .library-no-results h2 { margin: 0 0 7px; color: var(--forest); font-size: 22px; }
 .library-no-results p { color: #7b837a; font-size: 11px; }
-.library-resource-links { display: flex; flex-wrap: wrap; gap: 7px 12px; margin-top: 10px; }
-.library-resource-links a { color: #49634b; font-size: 9px; font-weight: 750; text-underline-offset: 3px; }
 .crop-guide { min-width: 0; padding: 29px clamp(20px, 3.2vw, 42px); background: #e9ebe1; }
 .guide-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-bottom: 18px; border-bottom: 1px solid #cdd3c8; }
 .guide-heading .eyebrow { margin-bottom: 7px; }

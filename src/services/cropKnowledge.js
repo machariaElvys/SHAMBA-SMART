@@ -126,7 +126,7 @@ export async function searchCropKnowledge({ crop, topic = "cultivation", locatio
   const matches = (data?.query?.search || []).slice(0, 5);
   const summaries = await Promise.allSettled(matches.map((match) => fetchWikipediaSummary(match.title, { signal })));
   if (matches.length > 0 && summaries.every((result) => result.status === "rejected")) {
-    throw new Error("The search found pages, but their summaries could not be loaded. Try again or open a KALRO resource.");
+    throw new Error("The search found Wikipedia pages, but their summaries could not be loaded. Try again.");
   }
   const retrievedAt = new Date().toISOString();
 

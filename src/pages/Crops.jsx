@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { searchCropKnowledge, searchCropGrowingRanges } from "../services/cropKnowledge";
 import "../styles/crops.css";
 import { useToast } from "../components/useToast";
 import { cropStorage } from "../services/cropStorage";
-import { AGRICULTURAL_RESOURCES, CROP_GUIDES, DEFAULT_STAGES, findCropGuide, guideSnapshot, searchCropGuides } from "../data/cropGuides";
+import { CROP_GUIDES, DEFAULT_STAGES, findCropGuide, guideSnapshot, searchCropGuides } from "../data/cropGuides";
 
 const NOTE_TYPES = ["Observation", "Watering", "Growth", "Pest or stress"];
 const MISSING_GUIDE_MESSAGE = "No verified growing guide is available for this crop yet. You can still add and manage it. Shamba-Smart will not guess its growing conditions.";
@@ -24,9 +25,10 @@ function completeRange(range) {
 }
 
 function cropGuidanceRanges(crop) {
+  const localGuide = findCropGuide(crop?.guide?.key || crop?.guideKey || crop?.name);
   return {
-    temperature: crop.growingGuidance?.ranges?.temperature || crop.guide?.recommendations?.preferredDayTemperature || null,
-    soilMoistureSensor: crop.growingGuidance?.ranges?.soilMoistureSensor || crop.guide?.recommendations?.soilMoistureSensorRange || null,
+    temperature: crop?.growingGuidance?.ranges?.temperature || crop?.guide?.recommendations?.preferredDayTemperature || localGuide?.recommendations?.preferredDayTemperature || null,
+    soilMoistureSensor: crop?.growingGuidance?.ranges?.soilMoistureSensor || crop?.guide?.recommendations?.soilMoistureSensorRange || localGuide?.recommendations?.soilMoistureSensorRange || null,
   };
 }
 
@@ -131,9 +133,14 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId, notes = [], s
   const selectedGuide = CROP_GUIDES.find((guide) => guide.key === selectedGuideKey) || findCropGuide(name);
   const matchingGuides = useMemo(() => searchCropGuides(name).slice(0, 5), [name]);
   const selectedCrop = crops.find((crop) => crop.id === currentCropId) || crops[0] || null;
+  const routeLocation = useLocation();
+  const requestedLookupCropId = new URLSearchParams(routeLocation.search).get("lookup");
   const cropNotes = useMemo(() => notes.filter((note) => note.cropId === selectedCrop?.id), [notes, selectedCrop?.id]);
 
   const lookupIdsRef = useRef(new Set());
+  const dashboardLookupIdsRef = useRef(new Set());
+  const automaticLookupIdsRef = useRef(new Set());
+  const lookupAndApplyRef = useRef(null);
   const [loadingGuidanceIds, setLoadingGuidanceIds] = useState(() => new Set());
 
   const updateCrop = (cropId, updates) => {
@@ -165,7 +172,23 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId, notes = [], s
       sources.push(localSource);
       const recommendations = localGuide.recommendations || {};
       if (!completeRange(ranges.temperature) && completeRange(recommendations.preferredDayTemperature)) {
-        ranges.temperature = guidanceField(recommendations.preferredDayTemperature, localSource, "locally-reviewed", null);
+        const recommendationSource = recommendations.preferredDayTemperature.source;
+        const temperatureSource = recommendationSource ? {
+          organization: recommendationSource.organization || localSource.organization,
+          title: recommendationSource.title || localSource.title,
+          url: recommendationSource.url || localSource.url,
+          confidence: "locally-reviewed",
+          verificationStatus: "verified",
+          appliedAt: checkedAt,
+        } : localSource;
+        if (recommendationSource) sources.push(temperatureSource);
+        ranges.temperature = guidanceField(
+          recommendations.preferredDayTemperature,
+          temperatureSource,
+          "locally-reviewed",
+          null,
+          recommendations.preferredDayTemperature.evidence
+        );
         applied.temperature = true;
         delete ambiguities.temperature;
       }
@@ -256,6 +279,7 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId, notes = [], s
 
     const guidance = {
       ...previousGuidance,
+      rangeLookupVersion: 1,
       cropName: crop.name,
       variety: crop.variety || previousGuidance.variety || null,
       region: crop.region || crop.county || localGuide?.applicableRegion || previousGuidance.region || null,
@@ -331,6 +355,34 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId, notes = [], s
       return next;
     });
   };
+
+  lookupAndApplyRef.current = lookupAndApply;
+
+  useEffect(() => {
+    const pendingCrops = crops.filter((crop) => (
+      crop?.id
+      && crop.growingGuidance?.rangeLookupVersion !== 1
+      && guidanceStatus(cropGuidanceRanges(crop)) !== "complete"
+      && !automaticLookupIdsRef.current.has(crop.id)
+    ));
+    pendingCrops.forEach((crop) => automaticLookupIdsRef.current.add(crop.id));
+    if (pendingCrops.length === 0) return;
+
+    void (async () => {
+      for (const crop of pendingCrops) {
+        await lookupAndApplyRef.current?.(crop);
+      }
+    })();
+  }, [crops]);
+
+  useEffect(() => {
+    if (!requestedLookupCropId || selectedCrop?.id !== requestedLookupCropId) return;
+    if (dashboardLookupIdsRef.current.has(requestedLookupCropId)) return;
+    if (guidanceStatus(cropGuidanceRanges(selectedCrop)) === "complete") return;
+
+    dashboardLookupIdsRef.current.add(requestedLookupCropId);
+    void lookupAndApply(selectedCrop);
+  }, [lookupAndApply, requestedLookupCropId, selectedCrop]);
 
   const addCrop = (event) => {
     event.preventDefault();
@@ -484,16 +536,16 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId, notes = [], s
       </header>
 
       <section className="crop-add-section" aria-labelledby="add-crop-title">
-        <div className="section-marker"><span className="section-number">01</span><div><h2 id="add-crop-title">Add to the field</h2><p>Search the local guide list, or enter a crop name to manage it without a guide.</p></div></div>
+        <div className="section-marker"><span className="section-number">01</span><div><h2 id="add-crop-title">Add to the field</h2><p>Search the crop index, or enter a crop name to manage it without a guide.</p></div></div>
         <form className="crop-form" onSubmit={addCrop}>
-          <label className="field crop-search-field"><span>Search crop guides or enter a crop name</span><input value={name} onChange={(event) => { setName(event.target.value); setSelectedGuideKey(""); }} placeholder="e.g. Maize, cassava, beans" autoComplete="off" aria-describedby="crop-guide-status" /></label>
+          <label className="field crop-search-field"><span>Search crop index or enter a crop name</span><input value={name} onChange={(event) => { setName(event.target.value); setSelectedGuideKey(""); }} placeholder="e.g. Maize, cassava, beans" autoComplete="off" aria-describedby="crop-guide-status" /></label>
           <label className="field"><span>Current stage</span><select value={stage} onChange={(event) => setStage(event.target.value)}>{DEFAULT_STAGES.map((item) => <option key={item}>{item}</option>)}</select></label>
           <div className="crop-form-actions"><button className="button button-secondary" type="submit" name="intent" value="lookup" disabled={!name.trim()}>Find &amp; Apply Growing Ranges</button><button className="button button-primary" type="submit" name="intent" value="add">Add crop <span aria-hidden="true">+</span></button></div>
 
-          {name.trim() && !selectedGuide && matchingGuides.length > 0 && <div className="guide-match-list" role="listbox" aria-label="Matching crop guides">{matchingGuides.map((guide) => <button className="guide-match-option" key={guide.key} type="button" role="option" aria-selected="false" onClick={() => chooseGuide(guide)}><span><strong>{guide.name}</strong><small>{guide.scientificName || "Crop entry"}</small></span><span className={`guide-match-status ${guide.verificationStatus}`}>{guide.verificationStatus === "verified" ? "KALRO source" : "Guide needed"}</span></button>)}</div>}
+          {name.trim() && !selectedGuide && matchingGuides.length > 0 && <div className="guide-match-list" role="listbox" aria-label="Matching crop guides">{matchingGuides.map((guide) => <button className="guide-match-option" key={guide.key} type="button" role="option" aria-selected="false" onClick={() => chooseGuide(guide)}><span><strong>{guide.name}</strong><small>{guide.scientificName || "Crop entry"}</small></span><span className={`guide-match-status ${guide.verificationStatus}`}>{guide.verificationStatus === "verified" ? "Verified" : "Guide needed"}</span></button>)}</div>}
 
           <div className={`crop-guide-preview ${selectedGuide?.verificationStatus === "verified" ? "is-verified" : "is-missing"}`} id="crop-guide-status" aria-live="polite">
-            {!name.trim() ? <><strong>Growing guidance is optional.</strong><span>Choose a source-backed guide or add a crop without entering technical ranges.</span></> : selectedGuide?.verificationStatus === "verified" ? <>
+            {!name.trim() ? <><strong>Growing guidance is optional.</strong><span>Add a crop without entering technical ranges, then use Wikipedia search for general information.</span></> : selectedGuide?.verificationStatus === "verified" ? <>
               <span className="guide-status-label">VERIFIED SOURCE · {selectedGuide.source.name}</span>
               <strong>{selectedGuide.recommendations.summary}</strong>
               <span>{selectedGuide.applicableRegion}</span>
@@ -502,22 +554,21 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId, notes = [], s
             </> : selectedGuide ? <>
               <span className="guide-status-label">UNVERIFIED ENTRY · NO SOURCE-BACKED THRESHOLDS</span>
               <strong>{MISSING_GUIDE_MESSAGE}</strong>
-              <span>{selectedGuide.source.name}. Existing demo targets are not used.</span>
-              <ResourceLinks />
+              <span>No source-backed recommendations are attached to this entry. Existing demo targets are not used.</span>
             </> : matchingGuides.length === 0 ? <>
               <span className="guide-status-label">GUIDE NEEDED</span>
               <strong>{MISSING_GUIDE_MESSAGE}</strong>
-              <ResourceLinks />
+              <span>After adding the crop, use its Wikipedia search for general background information.</span>
             </> : <>
               <span className="guide-status-label">POSSIBLE MATCHES</span>
-              <strong>Select a matching entry to preview its source, or add “{name.trim()}” without a guide.</strong>
+              <strong>Select the matching crop entry, or add “{name.trim()}” without a guide.</strong>
             </>}
           </div>
         </form>
       </section>
 
       <section className="field-list-section" aria-labelledby="field-list-title">
-        <div className="section-marker section-marker-tight"><span className="section-number">02</span><div><h2 id="field-list-title">Your field list</h2><p>Choose a crop, update its growth stage, review source details or remove it.</p></div></div>
+        <div className="section-marker section-marker-tight"><span className="section-number">02</span><div><h2 id="field-list-title">Your field list</h2><p>Choose a crop, update its growth stage, review saved Wikipedia references or remove it.</p></div></div>
         {crops.length === 0 ? (
           <div className="empty-field"><span className="empty-seed" aria-hidden="true" /><h3>Your field list is ready to begin.</h3><p>Add the first crop above. It will be saved on this device for your next visit.</p></div>
         ) : (
@@ -544,7 +595,7 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId, notes = [], s
                   </div>
                   <div className="crop-profile-line"><span>Temperature guidance <strong>{completeRange(guideTemperature) ? rangeText(guideTemperature, guideTemperature.unit || "°C") + (guideTemperature?.confidence === "externally-retrieved-unverified" ? " · unverified source" : crop.growingGuidance?.ranges?.temperature ? " · source" : " · guide") : temperatureTarget ? rangeText(temperatureTarget, "°C") + " · your range" : "Not available"}</strong>{completeRange(guideTemperature) && completeRange(temperatureTarget) && <small className="saved-farmer-range">Your range: {rangeText(temperatureTarget, "°C")}</small>}</span><span className={"crop-guide-state " + (rangeState === "complete" ? "verified" : "needed")}>{rangeState === "complete" ? "Ranges complete" : rangeState === "partial" ? "Partial ranges" : "Ranges needed"}</span><label className="stage-picker"><span className="sr-only">Growth stage for {crop.name}</span><select value={crop.stage} onChange={(event) => updateCrop(crop.id, { stage: event.target.value })}>{DEFAULT_STAGES.map((item) => <option key={item}>{item}</option>)}</select></label></div>
                   {guideVerified && <div className="crop-source-detail"><span>{guide.recommendations?.summary}</span><span>Region: {guide.applicableRegion}</span><a href={guide.source.url} target="_blank" rel="noreferrer">View {guide.source.name} ↗</a></div>}
-                  {!guideVerified && <div className="crop-source-detail"><span>{MISSING_GUIDE_MESSAGE}</span><ResourceLinks /></div>}
+                  {!guideVerified && <div className="crop-source-detail"><span>{MISSING_GUIDE_MESSAGE}</span></div>}
                   <CropWikipediaSearch crop={crop} onSaveReference={requestSaveReference} />
                   {crop.savedGuides?.length > 0 && <section className="crop-saved-guides" aria-label={`Saved source references for ${crop.name}`}><div className="crop-saved-guides-heading"><h4>Saved source references</h4><span>{crop.savedGuides.length} saved</span></div>{crop.savedGuides.map((reference) => <article className="crop-saved-reference" key={reference.id || reference.originalUrl}><div className="crop-saved-reference-meta"><span>SAVED REFERENCE · UNVERIFIED</span><time dateTime={reference.accessedAt || reference.retrievedAt}>{reference.accessedAt ? "Accessed " : "Retrieved "}{formatReferenceDate(reference.accessedAt || reference.retrievedAt)}</time></div><h5>{reference.sourceTitle || "Saved crop reference"}</h5><p>{reference.summary || "No source summary was saved."}</p><div><span>{reference.sourceOrganization || "Source organization unavailable"} · not expert-reviewed</span>{reference.originalUrl && <a href={reference.originalUrl} target="_blank" rel="noreferrer">Open the original source</a>}</div></article>)}</section>}
                   {editing && <div className="profile-editor">
@@ -614,10 +665,6 @@ function Crops({ crops, setCrops, currentCropId, setCurrentCropId, notes = [], s
   );
 }
 
-function ResourceLinks() {
-  return <div className="crop-resource-links">{AGRICULTURAL_RESOURCES.map((resource) => <a key={resource.url} href={resource.url} target="_blank" rel="noreferrer">Find a growing guide at {resource.name} ↗</a>)}</div>;
-}
-
 const WIKIPEDIA_TOPICS = [
   { value: "cultivation", label: "Cultivation" },
   { value: "soil", label: "Soil" },
@@ -674,11 +721,10 @@ function CropWikipediaSearch({ crop, onSaveReference }) {
       <p className="crop-wiki-disclaimer">Wikipedia is a general encyclopedia. It is not a verified local growing guide, and its search summaries never set crop targets.</p>
       <div className="crop-wiki-results" aria-live="polite">
         {searchState.status === "loading" && <p className="crop-wiki-state">Searching Wikipedia for {crop.name}…</p>}
-        {searchState.status === "error" && <div className="crop-wiki-state is-error"><p>{searchState.error}</p><ResourceLinks /></div>}
+        {searchState.status === "error" && <div className="crop-wiki-state is-error"><p>{searchState.error}</p></div>}
         {searchState.status === "complete" && searchState.results.length === 0 && (
           <div className="crop-wiki-state">
-            <p>No article could be confidently matched to {crop.name} and this topic. Try another agricultural topic or check a local KALRO resource.</p>
-            <ResourceLinks />
+            <p>No article could be confidently matched to {crop.name} and this topic. Try another topic or a different crop name.</p>
           </div>
         )}
         {searchState.status === "complete" && searchState.results.length > 0 && (

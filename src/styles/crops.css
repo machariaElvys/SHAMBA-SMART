@@ -30,8 +30,7 @@
 .crop-guide-preview strong { color: #3d5143; font-size: 11px; font-weight: 650; }
 .guide-status-label { color: #7d704f; font-size: 8px; font-weight: 850; letter-spacing: .12em; }
 .crop-guide-preview.is-verified .guide-status-label { color: #56704e; }
-.crop-guide-preview > a, .crop-resource-links a { width: fit-content; color: #48634b; font-size: 9px; font-weight: 750; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-.crop-resource-links { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.crop-guide-preview > a { width: fit-content; color: #48634b; font-size: 9px; font-weight: 750; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .empty-field { display: grid; justify-items: center; padding: 45px 18px 53px; border: 1px dashed #c5cbbb; background: rgb(252 251 246 / 55%); text-align: center; }
 .empty-seed { position: relative; width: 32px; height: 39px; display: block; margin-bottom: 14px; }
 .empty-seed::before { position: absolute; content: ""; left: 15px; bottom: 0; width: 1px; height: 28px; background: var(--leaf); }

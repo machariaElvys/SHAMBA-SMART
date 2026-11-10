@@ -1,63 +1,37 @@
 const DEFAULT_STAGES = ["Seedling", "Vegetative", "Flowering", "Fruiting", "Harvest"];
 
-export const AGRICULTURAL_RESOURCES = [
-  { name: "KALRO Good Agricultural Practices", url: "https://kalrogaps.info/" },
-  { name: "Kenya Digital Agriculture Platform (KALRO)", url: "https://keep.kalro.org/" },
-];
-
 export const CROP_GUIDES = [
   {
     key: "maize",
     name: "Maize",
     scientificName: "Zea mays",
     aliases: ["mahindi", "oduma", "bando", "madumwa", "corn"],
-    verificationStatus: "verified",
+    verificationStatus: "unverified",
     supportedGrowthStages: null,
-    source: {
-      name: "Kenya Digital Agriculture Platform (KALRO) · Maize",
-      url: "https://keep.kalro.org/good-agricultural-practices/Maize",
-    },
-    applicableRegion: "Kenya. KALRO notes that suitable varieties and performance differ by agro-ecological zone, soil and maturity period.",
-    recommendations: {
-      summary: "KALRO describes maize as adaptable across a range of Kenyan agro-ecological zones and soil types. It identifies deep, well-drained, well-aerated soils with organic matter as suitable conditions.",
-      cropWater: null,
-      soilMoistureSensorRange: null,
-      preferredDayTemperature: null,
-    },
+    source: { name: "No source-backed guide attached", url: null },
+    applicableRegion: null,
+    recommendations: null,
     limitations: [
-      "The reviewed page does not provide a soil-moisture sensor threshold, irrigation schedule or temperature range.",
-      "It is a general value-chain overview; choose guidance for the local variety, zone and growth stage.",
+      "No source-backed sensor threshold, irrigation schedule or temperature range is available in this entry.",
+      "Use Wikipedia search for general crop information; it does not establish farm-specific growing targets.",
     ],
-    localNotes: null,
+    localNotes: "No verified growing guide is attached to this crop yet. Wikipedia search can provide general background, but not verified growing targets.",
   },
   {
     key: "cassava",
     name: "Cassava",
     scientificName: "Manihot esculenta",
     aliases: ["muhogo", "omuogo", "mariwa", "marieba"],
-    verificationStatus: "verified",
+    verificationStatus: "unverified",
     supportedGrowthStages: null,
-    source: {
-      name: "KALRO Good Agricultural Practices · Cassava",
-      url: "https://www.kalrogaps.info/index.php/gaps-by-value-chain/cassava",
-    },
-    applicableRegion: "Kenyan smallholder context. Local rainfall distribution, soil, variety and altitude affect suitability.",
-    recommendations: {
-      summary: "KALRO describes cassava as drought tolerant, while noting that well-distributed rainfall and deep, well-drained soil support production and root development.",
-      cropWater: "The KALRO page gives annual rainfall context (generally 1,000–1,500 mm, with production possible from about 500 mm when rainfall is well distributed). This is rainfall guidance, not a sensor percentage or irrigation schedule.",
-      soilMoistureSensorRange: null,
-      preferredDayTemperature: {
-        min: 25,
-        max: 29,
-        unit: "°C",
-        label: "Preferred day temperature during the growing period",
-      },
-    },
+    source: { name: "No source-backed guide attached", url: null },
+    applicableRegion: null,
+    recommendations: null,
     limitations: [
-      "The rainfall guidance is not a soil-moisture sensor threshold and does not account for this farm's soil or irrigation system.",
-      "The page does not provide stage-specific recommendations; check local variety and site advice.",
+      "No source-backed sensor threshold, irrigation schedule or temperature range is available in this entry.",
+      "Use Wikipedia search for general crop information; it does not establish farm-specific growing targets.",
     ],
-    localNotes: null,
+    localNotes: "No verified growing guide is attached to this crop yet. Wikipedia search can provide general background, but not verified growing targets.",
   },
   {
     key: "beans",

@@ -14,6 +14,13 @@ function validRange(value) {
   return min === null && max === null ? null : { min, max };
 }
 
+function containsRetiredSource(value) {
+  if (typeof value === "string") return /\b(?:kalro|karlo)\b|(?:keep\.kalro\.org|kalrogaps\.info)/i.test(value);
+  if (Array.isArray(value)) return value.some(containsRetiredSource);
+  if (!value || typeof value !== "object") return false;
+  return Object.values(value).some(containsRetiredSource);
+}
+
 function normalizeCrop(crop) {
   const { idealMoisture, idealTemp, ...savedFields } = crop;
   const sourceLabel = String(crop.profileLabel || "").toLowerCase();
@@ -28,22 +35,25 @@ function normalizeCrop(crop) {
   const legacyValues = crop.legacyProfileValues || ((!isFarmerProfile && (idealMoisture || idealTemp))
     ? { idealMoisture: idealMoisture || null, idealTemp: idealTemp || null, profileLabel: crop.profileLabel || null }
     : null);
+  const savedGuides = Array.isArray(crop.savedGuides)
+    ? crop.savedGuides.filter((reference) => !containsRetiredSource(reference))
+    : [];
 
   return {
     ...savedFields,
-    guide: crop.guide?.verificationStatus
-      ? { ...guideSnapshot(guide), ...crop.guide }
-      : guideSnapshot(guide),
+    guide: guideSnapshot(guide),
     guideKey: guide?.key || null,
     guideStatus: guide?.verificationStatus || "missing",
+    growingGuidance: containsRetiredSource(crop.growingGuidance) ? null : crop.growingGuidance,
+    savedGuides,
     monitoringTargets: {
       soilMoisture: moistureRange,
       temperature: temperatureRange,
     },
     monitoringTargetSource: (moistureRange || temperatureRange) ? "farmer" : null,
-    legacyProfileValues: legacyValues,
+    legacyProfileValues: containsRetiredSource(legacyValues) ? null : legacyValues,
     profileLabel: guide?.verificationStatus === "verified"
-      ? `KALRO guide · ${guide.name}`
+      ? `Source guide · ${guide.name}`
       : guide?.verificationStatus === "unverified" ? "Guide needed · unverified entry" : "Guide needed",
     autoWater: false,
   };
@@ -51,10 +61,19 @@ function normalizeCrop(crop) {
 
 function readStoredCrops() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(CROPS_KEY) || "[]");
-    return Array.isArray(parsed)
-      ? parsed.filter((crop) => crop && typeof crop === "object").map(normalizeCrop)
-      : [];
+    const raw = localStorage.getItem(CROPS_KEY) || "[]";
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const crops = parsed.filter((crop) => crop && typeof crop === "object").map(normalizeCrop);
+    const normalized = JSON.stringify(crops);
+    if (normalized !== raw) {
+      try {
+        localStorage.setItem(CROPS_KEY, normalized);
+      } catch {
+        // Keep the cleaned records available in memory if browser storage is full.
+      }
+    }
+    return crops;
   } catch {
     return [];
   }
